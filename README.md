@@ -1,14 +1,16 @@
-# Auto-WiFi-hack
+# Auto WiFi hack script
+
 Bash script for automatically scan for WiFi APs, you choose one AP you want to get it's password 
 and the script do it's Magic. 
 
 
-Run manually before the script: 
+
+
+* Run manually before the script: 
 sudo airmon-ng check kill && sudo airmon-ng start wlan0 && sudo airodump-ng wlan0mon
 
-
-Preperation:
+* Preperation:
 WiFi card that can go to monitor mode.
 
- Desclaimer:
+ * Desclaimer:
  Attack only networks that you allowed to! do it for study.
