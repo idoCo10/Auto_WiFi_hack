@@ -1,6 +1,4 @@
 #!/bin/bash
-#Run manually before the script: 
-#sudo airmon-ng check kill && sudo airmon-ng start wlan0 && sudo airodump-ng wlan0mon
 
 UN=$SUDO_USER
 path="/home/$UN/Desktop/wifi_Targets"
