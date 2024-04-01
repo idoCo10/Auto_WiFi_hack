@@ -14,3 +14,11 @@ WiFi card that can go to monitor mode.
 
  * Desclaimer:
  Attack only networks that you allowed to! do it for study.
+
+Features
+Automated Wi-Fi network scanning
+WPA/WPA2 handshake capture
+Bruteforce attack capabilities
+Automated password cracking using dictionaries and rainbow tables
+Customizable attack parameters
+Detailed reporting of vulnerabilities and recommended security measures
