@@ -6,8 +6,7 @@ and the script do it's Magic.
 
 
 
-* Run manually before the script: 
-sudo airmon-ng check kill && sudo airmon-ng start wlan0 && sudo airodump-ng wlan0mon
+
 
 * Preperation:
 WiFi card that can go to monitor mode.
