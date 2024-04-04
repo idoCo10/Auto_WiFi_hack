@@ -4,7 +4,7 @@
 #sudo apt install gnome-terminal -y
 #sudo apt install wget -y
 
-# INsert your wifi adapter here:
+# insert your wifi adapter here:
 wifi_adapter=wlan0
 
 
@@ -38,14 +38,13 @@ check_wordlist() {
     fi
 }
 
-# Call the function
 check_wordlist
 
 
-#sudo airmon-ng check kill
+sudo airmon-ng check kill
 
 
-# Check if $wifi_adapter is available
+# Check if wifi_adapter is available
 if iw dev "$wifi_adapter" info &>/dev/null; then
     echo "Starting $wifi_adapter in monitor mode"
     sudo airmon-ng start "$wifi_adapter"
@@ -68,11 +67,10 @@ fi
 mkdir "$path/Scan"
 sudo chown -R $UN:$UN $path
 
-#clear
 
 
 function network_scanner() {
-	#clear
+	clear
         # Scan 10 seconds for wifi networks
         
         sudo gnome-terminal --geometry=93x35-10000-10000 -- timeout 10s sudo airodump-ng "$wifi_adapter"mon --ignore-negative-one --output-format csv -w $path/Scan/Scan-$current_date
@@ -312,3 +310,5 @@ gnome-terminal --geometry=1x1-10000-10000 -- sudo systemctl start NetworkManager
 # - Add sort by power
 # - hushcut - gpu
 # - add more wordlists 
+# - WPA2-WPA3
+# - WPA3
