@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path
-
 sudo apt update
 sudo apt install aircrack-ng -y 
 sudo apt install gnome-terminal -y
