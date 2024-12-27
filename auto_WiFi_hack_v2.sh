@@ -47,8 +47,17 @@ sudo chown -R $UN:$UN $targets_path
 # Dependencies Installation
 # ------------------------------
 function install_dependencies() {
-    sudo apt update
-    sudo apt install -y aircrack-ng gnome-terminal wget hashcat
+    echo -e "\nChecking required dependencies:\n"
+    packages=("aircrack-ng" "gnome-terminal" "wget" "hashcat")
+    for package in "${packages[@]}"; do
+        if ! dpkg -l | grep -q "^ii  $package "; then
+            sudo apt update
+            echo "$package is not installed. Installing..."
+            sudo apt install -y $package
+        else
+            echo "$package is already installed. Skipping..."
+        fi
+    done
 }
 
 
@@ -63,14 +72,13 @@ function check_wordlist() {
     fi
     # Check if rockyou.txt exists, if yes, continue code
     if [ -f "$rockyou_file" ]; then
-        echo "rockyou.txt found"
+        echo -e "\nrockyou.txt found"
         # Continue your code here
     else
         # Check if rockyou.gz exists, if yes, unzip it
         if [ -f "$rockyou_gz" ]; then
             echo "rockyou.gz found. Unzipping..."
             sudo gzip -d "$rockyou_gz"
-            # Continue your code here
         else
             echo "Downloading the rockyou file..."
             sudo wget -q -P $wordlists_dir https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt 
@@ -84,23 +92,25 @@ function check_wordlist() {
 # Adapter Configuration
 # ------------------------------
 function adapter_config() {
+	sudo airmon-ng check kill    # kill proccesses that interfere with airmon-ng
 	if iwconfig wlan1 &> /dev/null; then
 	    wifi_adapter="wlan1"
 	elif iw dev wlan1mon info &>/dev/null; then
 	    wifi_adapter="wlan1"
-	    echo "WiFi adapter: $wifi_adapter already in monitor mode. proceeding.."    
+	    echo "WiFi adapter: $wifi_adapter. The adapter already in monitor mode."
+	    return 0    
 	elif iwconfig wlan0 &> /dev/null; then
 	    wifi_adapter="wlan0"
 	elif iw dev wlan0mon info &>/dev/null; then
 	    wifi_adapter="wlan0"
-	    echo "WiFi adapter: $wifi_adapter already in monitor mode. proceeding.."
+	    echo "WiFi adapter: $wifi_adapter. The adapter already in monitor mode."
+	    return 0
 	else
 	    read -p "WiFi adapter not detected. Please enter the name of your WiFi adapter: " wifi_adapter
 	fi  	
-	sudo airmon-ng check kill    # kill proccesses that interfere with airmon-ng
 	echo -e "WiFi adapter: $wifi_adapter\nStarting $wifi_adapter in monitor mode"
 	sudo airmon-ng start "$wifi_adapter"
-	clear
+	#clear
 }
 
 
@@ -111,7 +121,7 @@ function network_scanner() {
         # Scan 10 seconds for wifi networks    
         sudo gnome-terminal --geometry=110x35-10000-10000 -- timeout 10s sudo airodump-ng --band abg "$wifi_adapter"mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date        
         countdown_duration=10
-        echo -e "\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
+        echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
 
         for (( i=$countdown_duration; i>=1; i-- )); do
             tput cuu1 && tput el
@@ -127,7 +137,7 @@ function network_scanner() {
         tail -n +2 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
         head -n -1 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
         clear
-        echo -e "\033[1;33mAvalible WiFi Networks:\033[0m\n"
+        echo -e "\n\033[1;33mAvalible WiFi Networks:\033[0m\n"
         # Display the scan input file contents with row numbers
         printf "    Name: %-35s Encryption: %-6s Channel: %-5s BSSID: %-1s\n" 
         echo
@@ -426,6 +436,4 @@ install_dependencies
 check_wordlist
 adapter_config
 main_process
-
-
 
