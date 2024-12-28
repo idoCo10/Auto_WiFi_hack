@@ -1,11 +1,13 @@
 #!/bin/bash
 
-# version: 2.2 28/12/24 06:48
+# version: 2.3 28/12/24 08:48
 # 	- Include 5/6G, correct writing to the wifi_passwords file
 #	- Added Power sorting.
+#	- Attack all at the same time.
 
 
 ### To Do ###
+# FIX ****** dont show Password not found in rockyou.txt if i stop the rockyou in the middle
 # for scan again options, just show the list again instead of scan if its less than 1 min.
 # option to run all networks or range of them at the same time.
 # use GPU ?
@@ -214,6 +216,22 @@ function network_scanner() {
                 echo -e "\033[1;32mPassword already exists for this network!\033[0m"
                 echo -e "\033[1;34mThe Wi-Fi password is:\033[0m \033[1;33m$wifi_password\033[0m\n"
                 exit 0
+                
+                
+            # Check if this BSSID was previously marked as failed    
+	    elif grep -A1 "We got handshake for ($bssid_address): $bssid_name" "$targets_path/wifi_passwords.txt" | grep -q "Password not found in rockyou.txt"; then
+		echo -e "\033[1;31mPassword for $bssid_name (BSSID: $bssid_address) was already checked and not found in rockyou.txt file.\033[0m\n"    
+		echo -e "\033[1;33mWould you like to try crack the handshake again? (Y/n)\033[0m"
+		read -p "Enter your choice: " user_choice
+		if [[ "$user_choice" == "y" || "$user_choice" == "Y" ]]; then
+		    echo -e "\n\033[1;32mContinuing to dictionary attack...\033[0m"
+                    cleanup
+                    dictionary_attack
+		else
+		    echo -e "\033[1;33mSkipping this network and proceeding to another scan.\033[0m"
+		    another_scan_prompt
+		fi
+
             # If no password exists, check if we captured the handshake
             elif sudo grep -q "We got handshake for ($bssid_address): $bssid_name" "$targets_path/wifi_passwords.txt"; then
                 echo -e "\033[1;32mHandshake found from previous scan!\033[0m\n"
@@ -221,7 +239,7 @@ function network_scanner() {
                 sudo pkill airodump-ng
                 echo
                 echo --- >> "$targets_path/wifi_passwords.txt"
-                check_previous_failure  # Check if this BSSID was previously marked as failed
+                cleanup
                 dictionary_attack
                 exit 1
             else
@@ -327,8 +345,7 @@ function deauth_attack() {
 # ------------------------------
 function check_previous_failure() {
     if grep -A1 "We got handshake for ($bssid_address): $bssid_name" "$targets_path/wifi_passwords.txt" | grep -q "Password not found in rockyou.txt"; then
-        echo -e "\033[1;31mPassword for $bssid_name (BSSID: $bssid_address) was already checked and not found in rockyou.txt file.\033[0m"    
-        # Prompt the user
+        echo -e "\033[1;31mPassword for $bssid_name (BSSID: $bssid_address) was already checked and not found in rockyou.txt file.\033[0m\n"    
         echo -e "\033[1;33mWould you like to try cracking the handshake again? (Y/n)\033[0m"
         read -p "Enter your choice: " user_choice
         if [[ "$user_choice" == "y" || "$user_choice" == "Y" ]]; then
@@ -355,7 +372,6 @@ function dictionary_attack() {
 	    echo -e "The wifi password of \033[1;31m\033[1m$bssid_name\033[0m is:	\033[1;31m\033[1m$wifi_pass\033[0m"
 	    #echo "The wifi password is:   $wifi_pass" >> $targets_path/wifi_passwords.txt
 	    sed -i "/We got handshake for ($bssid_address): $bssid_name/a The wifi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
-	    cleanup
 	    exit 1
 	else
 	    echo -e "\nCouldn't finf a match from rockyou wordlist.."
@@ -428,6 +444,7 @@ function main_process() {
 	network_scanner
 	devices_scanner
 	deauth_attack
+	cleanup
 	dictionary_attack
 }
 
