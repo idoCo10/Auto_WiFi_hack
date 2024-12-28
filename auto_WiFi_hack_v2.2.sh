@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# version: 2.0 28/12/24 04:48
-# 	- Include 5G, correct writing to the wifi_passwords file | 5:27
-#	- 
+# version: 2.2 28/12/24 06:48
+# 	- Include 5/6G, correct writing to the wifi_passwords file
+#	- Added Power sorting.
 
 
 ### To Do ###
@@ -10,7 +10,6 @@
 # option to run all networks or range of them at the same time.
 # use GPU ?
 # use differenet methods than rockyou
-# - Add sort by power
 # - hushcut - gpu
 # - add more wordlists 
 # - WPA2-WPA3
@@ -47,15 +46,12 @@ sudo chown -R $UN:$UN $targets_path
 # Dependencies Installation
 # ------------------------------
 function install_dependencies() {
-    echo -e "\nChecking required dependencies:\n"
     packages=("aircrack-ng" "gnome-terminal" "wget" "hashcat")
     for package in "${packages[@]}"; do
         if ! dpkg -l | grep -q "^ii  $package "; then
             sudo apt update
             echo "$package is not installed. Installing..."
             sudo apt install -y $package
-        else
-            echo "$package is already installed. Skipping..."
         fi
     done
 }
@@ -72,8 +68,7 @@ function check_wordlist() {
     fi
     # Check if rockyou.txt exists, if yes, continue code
     if [ -f "$rockyou_file" ]; then
-        echo -e "\nrockyou.txt found"
-        # Continue your code here
+        echo -e "\nrockyou.txt found\n"
     else
         # Check if rockyou.gz exists, if yes, unzip it
         if [ -f "$rockyou_gz" ]; then
@@ -92,24 +87,24 @@ function check_wordlist() {
 # Adapter Configuration
 # ------------------------------
 function adapter_config() {
-	sudo airmon-ng check kill    # kill proccesses that interfere with airmon-ng
+	sudo airmon-ng check kill > /dev/null 2>&1   # kill proccesses that interfere with airmon-ng
 	if iwconfig wlan1 &> /dev/null; then
 	    wifi_adapter="wlan1"
 	elif iw dev wlan1mon info &>/dev/null; then
 	    wifi_adapter="wlan1"
-	    echo "WiFi adapter: $wifi_adapter. The adapter already in monitor mode."
+	    echo -e "WiFi adapter: $wifi_adapter \nThe adapter in monitor mode."
 	    return 0    
 	elif iwconfig wlan0 &> /dev/null; then
 	    wifi_adapter="wlan0"
 	elif iw dev wlan0mon info &>/dev/null; then
 	    wifi_adapter="wlan0"
-	    echo "WiFi adapter: $wifi_adapter. The adapter already in monitor mode."
+	    echo -e "WiFi adapter: $wifi_adapter \nThe adapter in monitor mode."
 	    return 0
 	else
 	    read -p "WiFi adapter not detected. Please enter the name of your WiFi adapter: " wifi_adapter
 	fi  	
 	echo -e "WiFi adapter: $wifi_adapter\nStarting $wifi_adapter in monitor mode"
-	sudo airmon-ng start "$wifi_adapter"
+	sudo airmon-ng start "$wifi_adapter" > /dev/null 2>&1
 	#clear
 }
 
@@ -130,19 +125,26 @@ function network_scanner() {
         done
         mv $targets_path/Scan/Scan-$current_date-01.csv $scan_input
         cp "$scan_input" "$scan_input.original"
+        
         # Edit original scan file to more organized one:
-        awk -F, 'BEGIN {OFS=","} {print $1, $4, $6, $14}' "$scan_input" > "$scan_input.tmp"  && mv "$scan_input.tmp" "$scan_input"
+        awk -F, 'BEGIN {OFS=","} {print $1, $4, $6, $9, $14}' "$scan_input" > "$scan_input.tmp"  && mv "$scan_input.tmp" "$scan_input"
         awk '/^Station MAC,/ {print; exit} {print}' "$scan_input" > "$scan_input.tmp"  && mv "$scan_input.tmp" "$scan_input"
-        awk '$4 != ""' "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
+        awk '$5 != ""' "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
         tail -n +2 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
         head -n -1 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
-        clear
+        cp "$scan_input" "$scan_input.unsorted"
+        # Sort the scan_input file by Power (4th field) and then by Name (5th field)
+        awk -F, '{ gsub(/^ */, "", $0); gsub(/ *$/, "", $0); print $0 }' "$scan_input" | sort -t, -k4,4nr -k5 > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
+
+
+        #clear
         echo -e "\n\033[1;33mAvalible WiFi Networks:\033[0m\n"
         # Display the scan input file contents with row numbers
-        printf "    Name: %-35s Encryption: %-6s Channel: %-5s BSSID: %-1s\n" 
+        printf "    Name: %-35s Encryption: %-5s Channel: %-2s Power: %-4s BSSID: %-1s\n"
         echo
-        nl -w2 -s', ' "$scan_input" | awk -F', ' '{printf "%-1s. %-42s %-16s %-16s %-5s\n", $1, $5, $4, $3, $2}'
+        nl -w2 -s', ' "$scan_input" | awk -F', ' '{printf "%-1s. %-42s %-16s %-12s %-10s %-5s\n", $1, $6, $4, $3, $5, $2}'
         echo
+        
         # Prompt the user to choose a row number
         read -p "Enter row number: " row_number
         echo
@@ -174,7 +176,8 @@ function network_scanner() {
         bssid_address=$(echo "$chosen_row" | awk -F', ' '{print $1}')
         channel=$(echo "$chosen_row" | awk -F', ' '{print $2}')
         encryption=$(echo "$chosen_row" | awk -F', ' '{print $3}')
-        bssid_name=$(echo "$chosen_row" | awk -F', ' '{print $4}')
+        power=$(echo "$chosen_row" | awk -F', ' '{print $4}')
+        bssid_name=$(echo "$chosen_row" | awk -F', ' '{print $5}')
 
         # Remove "/" from bssid name
         if [[ $bssid_name == *"/"* ]]; then
@@ -190,11 +193,12 @@ function network_scanner() {
             echo -e "\033[1;31m\033[1mEncryption:\033[0m $encryption"
         fi
         echo -e "\033[1;31m\033[1mChannel:\033[0m $channel"
+        echo -e "\033[1;31m\033[1mPower:\033[0m $power"        
         echo
         echo
 
         if [ "$encryption" = "WPA3" ]; then
-            echo -e "\033[1mThe encryption is WPA3. Can't crack it yet.\033[0m"
+            echo -e "\033[1mThe encryption is WPA3. This script can't crack it yet.\033[0m"
             another_scan_prompt
         elif [ "$encryption" = "OPN" ]; then
             echo -e "\033[1mThe Network is open.\033[0m"
@@ -436,4 +440,6 @@ install_dependencies
 check_wordlist
 adapter_config
 main_process
+
+
 
