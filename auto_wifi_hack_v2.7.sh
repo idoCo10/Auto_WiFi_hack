@@ -1,10 +1,6 @@
 #!/bin/bash
 
-# version: 2.7 29/12/24 18:27
-# 	- Include 5/6G, correct writing to the wifi_passwords file
-#	- Added Power sorting.
-#	- Attack all at the same time. XXX
-#	- Add MAC device name - work for the scan too!, Adding now to device scan
+# version: 2.7 30/12/24 22:01
 
 
 ### To Do ###
@@ -12,7 +8,7 @@
 # for scan again options, just show the list again instead of scan if its less than 1 min.
 # option to run all networks or range of them at the same time.
 # use GPU ?
-# use differenet methods than rockyou
+# use differenet dictionaries than rockyou
 # - hushcut - gpu
 # - add more wordlists 
 # - WPA2-WPA3
@@ -129,9 +125,10 @@ function adapter_config() {
 # Network Scanner
 # ------------------------------
 function network_scanner() {	
-        # Scan 10 seconds for wifi networks    
-        sudo gnome-terminal --geometry=110x35-10000-10000 -- timeout 10s sudo airodump-ng --band abg "$wifi_adapter"mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date        
-        countdown_duration=10
+        # Scan 20 seconds for wifi networks   
+        countdown_duration=20 
+        sudo gnome-terminal --geometry=110x35-10000-10000 -- timeout "$countdown_duration"s sudo airodump-ng --band abg "$wifi_adapter"mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date        
+
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
         for (( i=$countdown_duration; i>=1; i-- )); do
             tput cuu1 && tput el
@@ -141,18 +138,31 @@ function network_scanner() {
         mv $targets_path/Scan/Scan-$current_date-01.csv $scan_input
         cp "$scan_input" "$scan_input.original"
         
+        # Extract client MAC and associated BSSID from the first scan
+        { printf "Station MAC:            BSSID:\n"
+          awk -F, '/Station MAC/ {flag=1; next} flag && $1 ~ /:/ {client_mac=$1; bssid=$6; if (bssid !~ /(not associated)/) printf "%-22s %s\n", client_mac, bssid}' "$scan_input.original"
+        } > "$scan_input.clients"
+        
+        
         # Edit original scan file to more organized one:
         awk -F, 'BEGIN {OFS=","} {print $1, $4, $6, $9, $14}' "$scan_input" > "$scan_input.tmp"  && mv "$scan_input.tmp" "$scan_input" # Extract the fields from the scan.(name,bssid,encryption,channel,power)
         awk '/^Station MAC,/ {print; exit} {print}' "$scan_input" > "$scan_input.tmp"  && mv "$scan_input.tmp" "$scan_input" # Delete the clients part from the scan        
         awk -F',' '$NF ~ /\S/' "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input" # Delete networks without names
         tail -n +2 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
         head -n -1 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"
-        cp "$scan_input" "$scan_input.unsorted"
         awk -F, '{ gsub(/^ */, "", $0); gsub(/ *$/, "", $0); print $0 }' "$scan_input" | sort -t, -k4,4nr -k5 > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input" # Sort by Power (4th field) and then by Name (5th field)
 
         echo -e "\n\033[1;33mAvalible WiFi Networks:\033[0m\n"
         # Display the scan input file contents with row numbers
-        printf "    Name: %-35s Encryption: %-4s Channel: %-3s Power: %-4s BSSID: %-12s Vendor: %-1s\n"
+        #printf "    Name: %-35s Encryption: %-4s Channel: %-3s Power: %-4s BSSID: %-12s Vendor: %-1s\n"
+        
+        printf "      Name: %-23s Clients: %-1s Encryption: %-4s Channel: %-3s Power: %-4s BSSID: %-12s Vendor: %-1s\n"
+        declare -A client_counts
+	while IFS= read -r client_line; do
+	    bssid=$(echo "$client_line" | awk '{print $2}')
+	    ((client_counts["$bssid"]++))
+	done < "$scan_input.clients"
+
         echo  
 	nl -w2 -s', ' "$scan_input" | awk -F', ' '{print $0}' | while read -r line; do
 	    # Extract fields from the line
@@ -165,13 +175,32 @@ function network_scanner() {
 
 	    # Get the vendor dynamically
 	    vendor=$(get_oui_vendor_scan "$mac")
+	    
+	    
+	    # Get the number of clients for this BSSID
+	    client_count=${client_counts["$mac"]}
+	    clients_display=""
+	    if [[ -n "$client_count" ]]; then
+		clients_display="+$client_count"
+	    fi	    
+	    
+	    
+	    
+	    if [[ -n "$vendor" ]]; then
+		printf "%-4s %-31s %-10s %-16s %-12s %-10s %-19s %-1s\n" \
+		    "$index." "$ssid" "$clients_display" "$encryption" "$channel" "$power" "$mac" "$vendor"
+	    else
+		printf "%-4s %-31s %-10s %-16s %-12s %-10s %-5s\n" \
+		    "$index." "$ssid" "$clients_display" "$encryption" "$channel" "$power" "$mac"
+	    fi
+
 
 	    # Print formatted output
-	    if [[ -n "$vendor" ]]; then
-		printf "%-3s %-42s %-16s %-12s %-10s %-19s %-1s\n" "$index." "$ssid" "$encryption" "$channel" "$power" "$mac" "$vendor"
-	    else
-		printf "%-3s %-42s %-16s %-12s %-10s %-5s\n" "$index." "$ssid" "$encryption" "$channel" "$power" "$mac"
-	    fi
+	    #if [[ -n "$vendor" ]]; then
+	#	printf "%-3s %-42s %-16s %-12s %-10s %-19s %-1s\n" "$index." "$ssid" "$encryption" "$channel" "$power" "$mac" "$vendor"
+	#    else
+#		printf "%-3s %-42s %-16s %-12s %-10s %-5s\n" "$index." "$ssid" "$encryption" "$channel" "$power" "$mac"
+#	    fi
 	done
 
         echo
@@ -430,7 +459,8 @@ function dictionary_attack() {
 	    exit 1
 	else
 	    echo -e "\nCouldn't finf a match from rockyou wordlist.."
-	    echo -e "Password not found in rockyou.txt" >> "$targets_path/wifi_passwords.txt"
+	    sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not found in rockyou.txt" "$targets_path/wifi_passwords.txt"
+	    #echo -e "Password not found in rockyou.txt" >> "$targets_path/wifi_passwords.txt"
 	    another_scan_prompt
 	fi
 }
