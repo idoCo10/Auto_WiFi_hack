@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 2.8 31/12/24 03:25
+# version: 2.8 31/12/24 18:25
 
 
 ### To Do ###
@@ -12,11 +12,12 @@
 # - hushcut - gpu
 # - WPA2-WPA3
 # David bombal methods
+# PMKID vs Handshake EAPOL
 
 
 # Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path
 # **IMPORTANT** for Alfa AWUS036AXML wifi card don't run apt upgrade. or else the card won't work.
-# To enable 6Ghz run: "sudo iw reg set US" and reboot.
+# To enable 6Ghz run: "sudo iw reg set US" and reboot. to check if its enabled run: "iw list".
 
 
 
