@@ -496,35 +496,23 @@ function gpu_crack() {
 # Retry Prompt
 # ------------------------------
 function another_scan_prompt() {
-    echo
-    read -p "Do you want to run another scan? (Y/n): " answer
-    echo
-    case $answer in
-        [Yy]* ) 
-            main_process ;;
-        [Nn]* ) 
-            echo -e "\nBye."
-	    cleanup
-            exit 1 ;;
-            
-            ######################################## DELETE ALL DOWN !!!!!!!!!!! ######################################
-        * ) 
-            while true; do
-                echo "Please answer yes or no (Y/n)."
-                echo
-                read -p "Do you want to run another scan? (Y/n): " answer
-                echo
-                case $answer in
-                    [Yy]* ) 
-                        main_process
-                        break ;;
-                    [Nn]* ) 
-                        echo -e "\nBye." 
-                        cleanup
-                        exit 1 ;;
-                esac
-            done ;;
-    esac
+    while true; do
+        echo
+        read -p "Do you want to run another scan? (Y/n): " answer
+        echo
+        case $answer in
+            [Yy]* )
+                main_process
+                break ;;
+            [Nn]* )
+                echo -e "\nBye."
+                cleanup
+                exit 1 ;;
+            * )
+                echo "Invalid input. Please answer yes or no (Y/n)."
+                ;;
+        esac
+    done
 }
 
 
