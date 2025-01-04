@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.0 3/1/25 16:46
+# version: 3.0 4/1/25 21:53
 
 
 ### To Do ###
@@ -131,7 +131,7 @@ function adapter_config() {
 # ------------------------------
 function network_scanner() {	
         # Scan 10 seconds for wifi networks   
-        countdown_duration=3
+        countdown_duration=15
         sudo gnome-terminal --geometry=110x35-10000-10000 -- timeout "$countdown_duration"s sudo airodump-ng --band abg "$wifi_adapter"mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -200,7 +200,6 @@ function network_scanner() {
 	done
 	echo
         
-        
         num_rows=$(awk '/Station MAC/ {exit} NF {count++} END {print count}' "$scan_input") # Calculate the number of valid rows (above the empty line before "Station MAC")
 		    	    
         choose_network
@@ -261,15 +260,14 @@ function choose_network() {
         echo
         echo
 
-
         if [ "$encryption" = "OPN" ]; then
             echo -e "\033[1mThe Network is open.\033[0m"
             echo -e "Choose different Network..\n"
-            continue  # Instead of recursion, continue the loop
-        elif [ "$encryption" = "WPA3" ]; then
-            echo -e "\033[1mThe encryption is WPA3. This script can't crack it yet.\033[0m"
+            continue  
+        elif [[ "$encryption" == *WPA3* ]]; then
+            echo -e "\033[1mThe encryption is "$encryption". This script can't crack it yet.\033[0m"
             echo -e "Choose different Network..\n"
-            continue  # Instead of recursion, continue the loop
+            continue 
         fi
 
         # Check if we already have the Wi-Fi password for this BSSID
@@ -278,14 +276,14 @@ function choose_network() {
             echo -e "\033[1;32mPassword already exists for this network!\033[0m"
             echo -e "\033[1;34mThe Wi-Fi password is:\033[0m \033[1;33m$wifi_password\033[0m\n"
             echo -e "Choose different Network..\n"
-            continue  # Instead of recursion, continue the loop
+            continue 
         fi
 
         # Check if this BSSID was previously marked as failed    
         if grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep -q "Password not found in rockyou.txt"; then
             echo -e "\033[1;34mPassword for $bssid_name (BSSID: $bssid_address)\033[0m was already checked and \033[1;31mnot found in rockyou.txt file.\033[0m\n" 
             echo -e "Choose different Network..\n"
-            continue  # Instead of recursion, continue the loop
+            continue 
         fi
 
         # If we only captured the handshake from previous scan
