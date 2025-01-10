@@ -12,7 +12,7 @@
 
 
 
-# Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path
+# Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path And OUI file for vendors name of devices and routers (will help identify farther attacks).
 
 # **IMPORTANT** for Alfa AWUS036AXML wifi card don't run apt upgrade. or else the card won't work (I couldn't solve it with the Linux drivers that Alfa offered).
 # To enable 6Ghz run: "sudo iw reg set US" and reboot. to check if its enabled run: "iw list".
