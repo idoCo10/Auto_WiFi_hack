@@ -4,19 +4,17 @@
 
 
 ### To Do ###
-# FIX ****** dont show Password not found in rockyou.txt if i stop the rockyou in the middle
-# for scan again options, just show the list again instead of scan if its less than 1 min.
 # option to run all networks or range of them at the same time.
-# use GPU ?
 # use differenet dictioneries than rockyou
-# - hushcut - gpu
-# - WPA2-WPA3
-# David bombal methods
-# PMKID vs Handshake EAPOL
+# Hushcut - GPU
+# Find attack for WPA2-WPA3, WPA3
+# PMKID, HXC..
+
 
 
 # Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path
-# **IMPORTANT** for Alfa AWUS036AXML wifi card don't run apt upgrade. or else the card won't work.
+
+# **IMPORTANT** for Alfa AWUS036AXML wifi card don't run apt upgrade. or else the card won't work (I couldn't solve it with the Linux drivers that Alfa offered).
 # To enable 6Ghz run: "sudo iw reg set US" and reboot. to check if its enabled run: "iw list".
 
 
