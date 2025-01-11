@@ -1,53 +1,109 @@
-Wi-Fi Network Auto-Cracker
+Description
 
-Overview
+This Bash script automates the process of scanning, attacking, and cracking Wi-Fi networks. It combines network scanning, deauthentication attacks, and dictionary-based password cracking to simplify the process of testing Wi-Fi network security.
 
-This Bash script automates the scanning, selection, and cracking of Wi-Fi networks using tools like aircrack-ng. Designed for advanced users, it provides functionalities such as:
-
-Network Scanning: Automatically scans and displays Wi-Fi networks, including details like BSSID, channel, encryption, power, and connected clients.
-
-Deauthentication Attack: Performs deauthentication attacks to capture WPA/WPA2 handshakes.
-
-Dictionary Attack: Attempts to crack Wi-Fi passwords using the captured handshake and a dictionary file.
-
-Vendor Detection: Identifies device vendors using their MAC addresses.
-
-Client Analysis: Scans and displays connected clients for target networks.
+> ⚠️ Disclaimer: This script is intended for educational and penetration testing purposes only. Unauthorized use to attack networks without permission is illegal and unethical. Use responsibly.
 
 
-⚠️ Disclaimer
-This script is intended for educational and ethical purposes only. Unauthorized use to access or disrupt networks is illegal and punishable by law. Use responsibly on networks you own or have permission to test.
 
 
 ---
 
 Features
 
-Automated Wi-Fi Scanning
+Wi-Fi Network Scanning:
 
-Detects available networks with detailed information.
+Detects available Wi-Fi networks and displays detailed information, including:
 
-Organizes data for easier target selection.
+SSID (Network Name)
 
+Encryption Type
 
-Deauthentication Attack
+Channel
 
-Disrupts target devices to capture WPA/WPA2 handshakes.
+Signal Strength (Power)
 
+BSSID (MAC Address)
 
-Password Cracking
-
-Uses a dictionary-based approach to find passwords.
-
-
-Device Vendor Lookup
-
-Maps MAC addresses to manufacturer names.
+Client Count
 
 
-User-Friendly Interface
+Automatically organizes and sorts scan results for easy readability.
 
-Interactive prompts for network selection and attack execution.
+
+Client Device Identification:
+
+Identifies client devices connected to specific Wi-Fi networks.
+
+Displays vendor information using OUI lookups.
+
+
+Deauthentication Attack:
+
+Executes deauthentication attacks to force clients to disconnect from the network.
+
+Captures WPA handshakes during the attack.
+
+
+Password Cracking:
+
+Uses captured WPA handshakes to attempt password cracking via a dictionary attack (e.g., rockyou.txt).
+
+Validates captured handshakes before cracking.
+
+
+Automatic Handshake Handling:
+
+Detects and skips networks with already cracked passwords or previously failed attempts.
+
+
+Open Network Detection:
+
+Automatically skips open (unencrypted) networks.
+
+
+
+
+---
+
+How It Works
+
+1. Network Scanning:
+
+Scans for nearby Wi-Fi networks for a specified duration.
+
+Outputs organized scan results with all relevant details.
+
+
+
+2. Target Selection:
+
+Prompts the user to choose a network based on the scan results.
+
+Automatically validates the selected network's availability.
+
+
+
+3. Deauthentication Attack:
+
+Attempts to capture a WPA handshake by deauthenticating client devices.
+
+Repeats the attack up to a defined number of attempts.
+
+
+
+4. Handshake Validation and Cracking:
+
+If a handshake is captured, the script validates it and starts a dictionary attack to crack the Wi-Fi password.
+
+
+
+5. Device Scanning:
+
+Scans for client devices connected to the target network.
+
+Displays MAC addresses and vendor details for all connected devices.
+
 
 
 
@@ -56,39 +112,14 @@ Interactive prompts for network selection and attack execution.
 
 Requirements
 
-Linux OS with tools like aircrack-ng, awk, and grep.
+Operating System:
 
-Wi-Fi Adapter supporting monitor mode.
+Linux (Kali, Ubuntu or any other Debian-based distribution)
+
 
 Dependencies:
 
-airodump-ng, aireplay-ng (from aircrack-ng suite).
-
-gnome-terminal for terminal sessions.
-
-rockyou.txt or similar wordlist for cracking.
-
-
-
-
----
-
-Setup
-
-1. Clone the repository:
-
-git clone https://github.com/yourusername/wifi-auto-cracker.git  
-cd wifi-auto-cracker
-
-
-2. Grant execute permissions to the script:
-
-chmod +x wifi_auto_cracker.sh
-
-
-3. Install required tools:
-
-sudo apt-get install aircrack-ng gnome-terminal
+The script install the required dependencies.
 
 
 
@@ -97,60 +128,53 @@ sudo apt-get install aircrack-ng gnome-terminal
 
 Usage
 
-1. Run the script with administrative privileges:
+1. Clone the repository:
 
-sudo ./wifi_auto_cracker.sh
-
-
-2. Follow the interactive prompts to:
-
-Scan available Wi-Fi networks.
-
-Select a target network.
-
-Perform deauthentication and handshake capture.
-
-Crack passwords using a wordlist.
+git clone https://github.com/idoCo10/Auto_WiFi_hack.git
+cd Auto_WiFi_hack
 
 
+2. Make the script executable:
+
+chmod +x Auto_WiFi_hack.sh
+
+
+3. Run the script with administrative privileges:
+
+sudo ./Auto_WiFi_hack.sh
+
+
+---
+
+Output Details
+
+Wi-Fi Network List: Displays all detected networks with details like SSID, encryption type, and client count.
+
+Client Devices: Shows MAC addresses and vendor information of devices connected to the selected network.
+
+Captured Handshakes: Validates and saves successful handshakes.
+
+Cracked Passwords: Outputs cracked passwords for selected networks.
 
 
 
 ---
 
-Output
+Important Notes
 
-Displays detailed information about scanned networks.
+File Management:
 
-Saves handshake files and cracked passwords for future reference.
+Scan results are saved in a structured format for easy review.
 
-
-
----
-
-Example
-
-Scanning available WiFi Networks (15 s):  
-1. SSID: MyWiFi          Clients: 3  Encryption: WPA2  Channel: 6  Power: -45  BSSID: 00:11:22:33:44:55  
-2. SSID: OpenNetwork     Clients: 0  Encryption: OPN   Channel: 11 Power: -60  BSSID: 66:77:88:99:AA:BB  
-
-Enter row number: 1  
-
-Starting deauth attack ->>  
-Attempting to capture handshake...  
-
-->> Got the handshake!  
-Cracking password with rockyou.txt...  
-Wi-Fi password is: password123
+Captured handshakes and cracked passwords are logged for future reference.
 
 
----
+Error Handling:
 
-Notes
+Skips open networks and networks with unsupported encryption (e.g., WPA3).
 
-Output Storage: Scanned data, handshakes, and cracked passwords are stored in designated directories.
+Alerts the user if no handshakes are captured or if cracking fails.
 
-Vendor File: To map MAC addresses to vendors, include an OUI file (e.g., oui.txt).
 
 
 
@@ -158,6 +182,21 @@ Vendor File: To map MAC addresses to vendors, include an OUI file (e.g., oui.txt
 
 Legal Disclaimer
 
-The use of this script without explicit authorization is prohibited. It is the user's responsibility to comply with applicable laws and regulations.
+This tool is for authorized penetration testing and educational purposes only.
+Using this script against networks without explicit permission is illegal and violates ethical standards.
+The authors are not responsible for misuse of this tool.
 
+
+---
+
+License
+
+This project is licensed under the MIT License. See the LICENSE file for more information.
+
+
+---
+
+Contributions
+
+Contributions, bug reports, and feature requests are welcome. Please open an issue or submit a pull request for any suggestions.
 
