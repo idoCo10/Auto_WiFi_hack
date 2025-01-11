@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.0 4/1/25 21:53
+# version: 3.0 11/1/25 18:04
 
 
 ### To Do ###
@@ -24,7 +24,7 @@
 # ------------------------------
 # Variables
 # ------------------------------
-UN=$SUDO_USER
+UN=${SUDO_USER:-$(whoami)}
 current_date=$(date +"%d_%m_%y")
 targets_path="/home/$UN/Desktop/wifi_Targets"
 scan_input="$targets_path/Scan/Scan-$current_date.csv"
@@ -50,7 +50,7 @@ sudo chown -R $UN:$UN $targets_path
 # Dependencies Installation
 # ------------------------------
 function install_dependencies() {
-    packages=("aircrack-ng" "gnome-terminal" "wget" "hashcat")
+    packages=("aircrack-ng" "gnome-terminal" "wget" "hashcat" "dbus-x11")
     for package in "${packages[@]}"; do
         if ! dpkg -l | grep -q "^ii  $package "; then
             sudo apt update
@@ -119,7 +119,21 @@ function adapter_config() {
 	    read -p "WiFi adapter not detected. Please enter the name of your WiFi adapter: " wifi_adapter
 	fi  	
 	echo -e "\e[1mWiFi adapter:\e[0m $wifi_adapter\nStarting $wifi_adapter in monitor mode"
+ 
 	sudo airmon-ng start "$wifi_adapter" > /dev/null 2>&1
+
+ 	# Find the new monitor mode adapter name
+	mon_adapter=$(iw dev | awk '/Interface/ && /mon$/ {print $2}')
+
+	if [[ -n "$mon_adapter" ]]; then
+		# Extract the original adapter name by removing 'mon' from the end
+		wifi_adapter="${mon_adapter%mon}"
+		#echo -e "\e[1mMonitor mode adapter:\e[0m $mon_adapter"
+		#echo -e "\e[1mOriginal adapter name set to:\e[0m $wifi_adapter"
+	else
+		echo -e "\e[31mFailed to start monitor mode. Check your adapter and try again.\e[0m"
+		return 1
+	fi
 }
 
 
