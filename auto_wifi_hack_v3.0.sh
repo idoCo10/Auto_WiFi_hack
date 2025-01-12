@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.0 11/1/25 18:04
+# version: 3.0 12/1/25 13:43
 
 
 ### To Do ###
@@ -102,34 +102,42 @@ function check_wordlist() {
 # Adapter Configuration
 # ------------------------------
 function adapter_config() {
-	sudo airmon-ng check kill > /dev/null 2>&1   # kill proccesses that interfere with airmon-ng
+	sudo airmon-ng check kill > /dev/null 2>&1   # Kill interfering processes
+
+	# Check known adapters first
 	if iwconfig wlan1 &> /dev/null; then
 	    wifi_adapter="wlan1"
 	elif iw dev wlan1mon info &>/dev/null; then
 	    wifi_adapter="wlan1"
-	    echo -e "\e[1mWiFi adapter:\e[0m $wifi_adapter \nThe adapter in monitor mode."
+	    echo -e "\e[1mWiFi adapter:\e[0m $wifi_adapter \nThe adapter is in monitor mode."
 	    return 0    
 	elif iwconfig wlan0 &> /dev/null; then
 	    wifi_adapter="wlan0"
 	elif iw dev wlan0mon info &>/dev/null; then
 	    wifi_adapter="wlan0"
-	    echo -e "\e[1mWiFi adapter:\e[0m $wifi_adapter \nThe adapter in monitor mode."
+	    echo -e "\e[1mWiFi adapter:\e[0m $wifi_adapter \nThe adapter is in monitor mode."
 	    return 0
 	else
-	    read -p "WiFi adapter not detected. Please enter the name of your WiFi adapter: " wifi_adapter
+	    # Auto-detect WiFi adapter before asking the user
+	    detected_adapter=$(iw dev | awk '$1=="Interface"{print $2}')
+	    if [[ -n "$detected_adapter" ]]; then
+	        wifi_adapter="$detected_adapter"
+	        #echo -e "\e[1mDetected WiFi adapter:\e[0m $wifi_adapter"
+	    else
+	        read -p "WiFi adapter not detected. Please enter the name of your WiFi adapter: " wifi_adapter
+	    fi
 	fi  	
-	echo -e "\e[1mWiFi adapter:\e[0m $wifi_adapter\nStarting $wifi_adapter in monitor mode"
- 
+
+	echo -e "\e[1mWiFi adapter:\e[0m $wifi_adapter\nChanging $wifi_adapter to monitor mode"
+
 	sudo airmon-ng start "$wifi_adapter" > /dev/null 2>&1
 
- 	# Find the new monitor mode adapter name
+	# Find the new monitor mode adapter name
 	mon_adapter=$(iw dev | awk '/Interface/ && /mon$/ {print $2}')
 
 	if [[ -n "$mon_adapter" ]]; then
 		# Extract the original adapter name by removing 'mon' from the end
 		wifi_adapter="${mon_adapter%mon}"
-		#echo -e "\e[1mMonitor mode adapter:\e[0m $mon_adapter"
-		#echo -e "\e[1mOriginal adapter name set to:\e[0m $wifi_adapter"
 	else
 		echo -e "\e[31mFailed to start monitor mode. Check your adapter and try again.\e[0m"
 		return 1
