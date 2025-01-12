@@ -394,7 +394,7 @@ function devices_scanner() {
 	    target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")
 	    if [ -n "$target_devices" ]; then
 		# Print Devices_Found with vendor names
-		echo -e "\033[1;33m\nDevices_Found:\033[0m" 
+		echo -e "\033[1;33m\nDevices Found:\033[0m" 
 		echo -e "$target_devices" | tr ' ' '\n' | while read -r mac; do
 		    if [[ -n "$mac" ]]; then
 			# Call the function to get the vendor
