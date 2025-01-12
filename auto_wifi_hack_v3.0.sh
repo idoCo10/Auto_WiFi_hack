@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# version: 3.0 12/1/25 13:43
+# version: 3.0 12/1/25 15:10
 
 
 ### To Do ###
+# FIX - none English characters changing the orgenized print
 # option to run all networks or range of them at the same time.
 # use differenet dictioneries than rockyou
 # Hushcut - GPU
@@ -210,13 +211,17 @@ function network_scanner() {
 	    if [[ -n "$client_count" ]]; then
 		clients_display="+$client_count"
 	    fi
+     
+	    ssid_display=$(awk -v s="$ssid" 'BEGIN { n = length(s); printf "%-*s", (n < 38 ? 38 : n), s }') # fix none English characters - NOT PERFECT YET
+
 	    if [[ -n "$vendor" ]]; then
 		printf "%-4s %-38s %-10s %-16s %-12s %-10s %-19s %-1s\n" \
-		    "$index." "$ssid" "$clients_display" "$encryption" "$channel" "$power" "$mac" "$vendor"
+		    "$index." "$ssid_display" "$clients_display" "$encryption" "$channel" "$power" "$mac" "$vendor"
 	    else
 		printf "%-4s %-38s %-10s %-16s %-12s %-10s %-5s\n" \
-		    "$index." "$ssid" "$clients_display" "$encryption" "$channel" "$power" "$mac"
+		    "$index." "$ssid_display" "$clients_display" "$encryption" "$channel" "$power" "$mac"
 	    fi
+     
 	done
 	echo
         
