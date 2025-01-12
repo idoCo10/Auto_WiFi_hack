@@ -114,7 +114,7 @@ Requirements
 
 Operating System:
 
-Linux (Kali, Ubuntu or any other Debian-based distribution)
+Kali Linux
 
 
 Dependencies:
