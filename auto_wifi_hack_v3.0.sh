@@ -144,7 +144,7 @@ function adapter_config() {
 function network_scanner() {	
         # Scan 10 seconds for wifi networks   
         countdown_duration=15
-        sudo gnome-terminal --geometry=110x35-10000-10000 -- timeout "$countdown_duration"s sudo airodump-ng --band abg "$wifi_adapter"mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date        
+        sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
         for (( i=$countdown_duration; i>=1; i-- )); do
