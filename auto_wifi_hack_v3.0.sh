@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.0 12/1/25 15:10
+# version: 3.0.1 13/1/25 15:11
 
 
 ### To Do ###
@@ -183,10 +183,10 @@ function network_scanner() {
 	echo -e "\n\033[1;33mAvailable WiFi Networks:\033[0m\n"
 
 	# Display the scan input file contents with row numbers
-	printf "      Name: %-30s Clients: %-2s Encryption: %-4s Channel: %-3s Power: %-3s BSSID: %-12s Vendor: %-1s\n"
- 	echo "--------------------------------------------------------------------------------------------------------------------------------------------------"
-	
- 	declare -A client_counts
+	printf "      Name: %-30s Clients: %-1s Encryption: %-3s Channel: %-1s Power: %-2s BSSID: %-13s Vendor: %-1s\n"
+	echo "--------------------------------------------------------------------------------------------------------------------------------------------------"
+
+	declare -A client_counts
 	while IFS= read -r client_line; do
 	    bssid=$(echo "$client_line" | awk '{print $2}')
 	    # Ensure bssid is not empty before incrementing
@@ -206,8 +206,8 @@ function network_scanner() {
 	    channel=$(echo "$line" | cut -d',' -f3 | xargs)
 	    encryption=$(echo "$line" | cut -d',' -f4 | xargs)
 	    power=$(echo "$line" | cut -d',' -f5 | xargs)
-	    ssid=$(echo "$line" | cut -d',' -f6)
-	    
+	    ssid=$(echo "$line" | cut -d',' -f6 | tr -d '|')  # remove "|" from SSID name
+
 	    # Get the vendor dynamically
 	    vendor=$(get_oui_vendor_scan "$mac")
 	    # Get the number of clients for this BSSID
@@ -216,18 +216,16 @@ function network_scanner() {
 	    if [[ -n "$client_count" ]]; then
 		clients_display="+$client_count"
 	    fi
-     
-	    ssid_display=$(awk -v s="$ssid" 'BEGIN { n = length(s); printf "%-*s", (n < 38 ? 38 : n), s }') # fix none English characters - NOT PERFECT YET
 
+	    # Use printf to format the fields and pipe into column for proper alignment
 	    if [[ -n "$vendor" ]]; then
-		printf "%-4s %-38s %-10s %-16s %-12s %-10s %-19s %-1s\n" \
-		    "$index." "$ssid_display" "$clients_display" "$encryption" "$channel" "$power" "$mac" "$vendor"
+		printf "%-4s %-35s | %-7s | %-12s | %-7s | %-5s | %-17s | %-1s\n" \
+		    "$index." "$ssid" "$clients_display" "$encryption" "$channel" "$power" "$mac" "$vendor"
 	    else
-		printf "%-4s %-38s %-10s %-16s %-12s %-10s %-5s\n" \
-		    "$index." "$ssid_display" "$clients_display" "$encryption" "$channel" "$power" "$mac"
+		printf "%-4s %-35s | %-7s | %-12s | %-7s | %-5s | %-17s\n" \
+		    "$index." "$ssid" "$clients_display" "$encryption" "$channel" "$power" "$mac"
 	    fi
-     
-	done
+	done | column -t -s "|"
 	echo
         
         num_rows=$(awk '/Station MAC/ {exit} NF {count++} END {print count}' "$scan_input") # Calculate the number of valid rows (above the empty line before "Station MAC")
