@@ -4,9 +4,9 @@
 
 
 ### To Do ###
-# FIX - none English characters changing the orgenized print
 # option to run all networks or range of them at the same time.
-# use differenet dictioneries than rockyou
+# use differenet dictioneries than rockyou? 
+# specific passwords for different vendors
 # Hushcut - GPU
 # Find attack for WPA2-WPA3, WPA3
 # PMKID, HXC..
