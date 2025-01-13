@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.0.1 13/1/25 15:11
+# version: 3.0.1 13/1/25 16:20
 
 
 ### To Do ###
@@ -183,8 +183,8 @@ function network_scanner() {
 	echo -e "\n\033[1;33mAvailable WiFi Networks:\033[0m\n"
 
 	# Display the scan input file contents with row numbers
-	printf "      Name: %-30s Clients: %-1s Encryption: %-3s Channel: %-1s Power: %-2s BSSID: %-13s Vendor: %-1s\n"
-	echo "--------------------------------------------------------------------------------------------------------------------------------------------------"
+	printf "\033[1m      Name: %-30s Clients: %-1s Encryption: %-3s Channel: %-1s Power: %-2s BSSID: %-13s Vendor: %-1s\033[0m\n"
+ 	echo "--------------------------------------------------------------------------------------------------------------------------------------------------"
 
 	declare -A client_counts
 	while IFS= read -r client_line; do
