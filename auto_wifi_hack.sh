@@ -151,7 +151,7 @@ function adapter_config() {
 # Network Scanner
 # ------------------------------
 function network_scanner() {	
-        # Scan 10 seconds for wifi networks   
+        # Scan 15 seconds for wifi networks   
         countdown_duration=15
         sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
@@ -183,8 +183,8 @@ function network_scanner() {
 	echo -e "\n\033[1;33mAvailable WiFi Networks:\033[0m\n"
 
 	# Display the scan input file contents with row numbers
-	printf "\033[1m      Name: %-30s Clients: %-1s Encryption: %-3s Channel: %-1s Power: %-2s BSSID: %-13s Vendor: %-1s\033[0m\n"
- 	echo "--------------------------------------------------------------------------------------------------------------------------------------------------"
+	printf "\033[1m      Name: %-30s Clients: %-1s Encryption: %-3s Channel: %-1s Power: %-1s Signal: %-0s BSSID: %-13s Vendor: %-1s\033[0m\n"
+	echo "--------------------------------------------------------------------------------------------------------------------------------------------------"
 
 	declare -A client_counts
 	while IFS= read -r client_line; do
@@ -216,14 +216,29 @@ function network_scanner() {
 	    if [[ -n "$client_count" ]]; then
 		clients_display="+$client_count"
 	    fi
-
+	      
+	    # Convert dBm power values into signal bars representation
+	    signal_strength=$power  # Assuming power is in dBm (negative values)
+    	    if (( signal_strength >= -50 )); then
+	        bars="\e[1;32m▂▄▆█\e[0m"  # Excellent
+	    elif (( signal_strength >= -60 )); then
+	        bars="\e[1;33m▂▄▆_\e[0m"  # Good 
+	    elif (( signal_strength >= -70 )); then
+	        bars="\e[1;35m▂▄__\e[0m"  # Fair
+	    elif (( signal_strength >= -80 )); then
+	        bars="\e[1;36m▂___\e[0m"  # Weak 
+	    else
+	        bars="\e[1;31m____\e[0m"  # Very Weak 
+	    fi
+	    
+	       
 	    # Use printf to format the fields and pipe into column for proper alignment
 	    if [[ -n "$vendor" ]]; then
-		printf "%-4s %-35s | %-7s | %-12s | %-7s | %-5s | %-17s | %-1s\n" \
-		    "$index." "$ssid" "$clients_display" "$encryption" "$channel" "$power" "$mac" "$vendor"
+		printf "%-4s %-35s | %-7s | %-12s | %-7s | %-5s | %-5b | %-17s | %-1s\n" \
+		    "$index." "$ssid" "$clients_display" "$encryption" "$channel" "$power" "$bars" "$mac" "$vendor"
 	    else
-		printf "%-4s %-35s | %-7s | %-12s | %-7s | %-5s | %-17s\n" \
-		    "$index." "$ssid" "$clients_display" "$encryption" "$channel" "$power" "$mac"
+		printf "%-4s %-35s | %-7s | %-12s | %-7s | %-5s | %-5b | %-17s\n" \
+		    "$index." "$ssid" "$clients_display" "$encryption" "$channel" "$power" "$bars" "$mac"
 	    fi
 	done | column -t -s "|"
 	echo
@@ -231,7 +246,6 @@ function network_scanner() {
         num_rows=$(awk '/Station MAC/ {exit} NF {count++} END {print count}' "$scan_input") # Calculate the number of valid rows (above the empty line before "Station MAC")
 		    	    
         choose_network
-        
 }
 
 
