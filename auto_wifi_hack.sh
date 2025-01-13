@@ -1,24 +1,22 @@
 #!/bin/bash
 
-# version: 3.0.1 13/1/25 16:20
+# version: 3.0.1 13/1/25 19:10
 
 
 ### To Do ###
-# option to run all networks or range of them at the same time.
-# use differenet dictioneries than rockyou? 
-# specific passwords for different vendors
-# Hushcut - GPU
-# Find attack for WPA2-WPA3, WPA3
-# PMKID, HXC..
-
+# run all networks or range of them at the same time.
+# add more dictioneries than rockyou?
+# specific passwords lists for different vendors
+# functions to crack PMKID (using hcxpcapngtool..)
+# crack with hashcat - can look default vendors length (for example: ZTE - 8 capital and numbers)
+# cracking using GPU
+# find attacks for WPA2-WPA3, WPA3
 
 
 # Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path And OUI file for vendors name of devices and routers (will help identify farther attacks).
 
 # **IMPORTANT** for Alfa AWUS036AXML wifi card don't run apt upgrade. or else the card won't work (I couldn't solve it with the Linux drivers that Alfa offered).
 # To enable 6Ghz run: "sudo iw reg set US" and reboot. to check if its enabled run: "iw list".
-
-
 
 
 
