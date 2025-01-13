@@ -183,11 +183,16 @@ function network_scanner() {
 	echo -e "\n\033[1;33mAvailable WiFi Networks:\033[0m\n"
 
 	# Display the scan input file contents with row numbers
-	printf "      Name: %-30s Clients: %-2s Encryption: %-4s Channel: %-3s Power: %-3s BSSID: %-12s Vendor: %-1s\n\n"
-	declare -A client_counts
+	printf "      Name: %-30s Clients: %-2s Encryption: %-4s Channel: %-3s Power: %-3s BSSID: %-12s Vendor: %-1s\n"
+ 	echo "--------------------------------------------------------------------------------------------------------------------------------------------------"
+	
+ 	declare -A client_counts
 	while IFS= read -r client_line; do
 	    bssid=$(echo "$client_line" | awk '{print $2}')
-	    ((client_counts["$bssid"]++))
+	    # Ensure bssid is not empty before incrementing
+	    if [[ -n "$bssid" ]]; then
+		((client_counts["$bssid"]++))
+	    fi
 	done <<< "$clients_content"
 
 	# Process and display only the WiFi network section (exclude the Station MAC section)
