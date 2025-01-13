@@ -217,13 +217,13 @@ function network_scanner() {
 	      
 	    # Convert dBm power values into signal bars representation
 	    signal_strength=$power  # Assuming power is in dBm (negative values)
-    	    if (( signal_strength >= -50 )); then
+    	    if (( signal_strength >= -60 )); then
 	        bars="\e[1;32m▂▄▆█\e[0m"  # Excellent
-	    elif (( signal_strength >= -60 )); then
-	        bars="\e[1;33m▂▄▆_\e[0m"  # Good 
 	    elif (( signal_strength >= -70 )); then
-	        bars="\e[1;35m▂▄__\e[0m"  # Fair
+	        bars="\e[1;33m▂▄▆_\e[0m"  # Good 
 	    elif (( signal_strength >= -80 )); then
+	        bars="\e[1;35m▂▄__\e[0m"  # Fair
+	    elif (( signal_strength >= -90 )); then
 	        bars="\e[1;36m▂___\e[0m"  # Weak 
 	    else
 	        bars="\e[1;31m____\e[0m"  # Very Weak 
