@@ -430,7 +430,7 @@ function devices_scanner() {
 		echo
 		break
 	    fi
-	    echo -e "Scanning for devices..  \e[1;34m$i/10\e[0m"
+	    echo -e "Scanning for devices..  \e[1;34m$i/20\e[0m"
 	    sleep 3
 	done
 	if [ -z "$target_devices" ]; then
