@@ -19,6 +19,16 @@
 # 	To enable 6Ghz run: "sudo iw reg set US" and reboot. to check if its enabled run: "iw list".
 
 
+# **IMPORTANT** if we use GPU with Hashcat:
+# 	If there is blank screen after installing the GPU drivers on Kali live persistance -
+# 	You need to modify the file "/boot/grub/grub.cfg" from different operation system! (on kali the file will be read only):
+# 	Add to the end of the kali live entry the word "nomodeset" like that:
+# 		menuentry "Live system with USB persistence  (check kali.org/prst)" {
+#			linux /live/vmlinuz-6.8.11-amd64 boot=live persistence components quiet splash noeject findiso=${iso_path} persistence nomodeset
+#			initrd /live/initrd.img-6.8.11-amd64
+# 		}
+
+
 
 # ----------------
 # Variables
@@ -846,6 +856,3 @@ if $gpu_enabled; then
 fi
 adapter_config
 main_process
-
-
-
