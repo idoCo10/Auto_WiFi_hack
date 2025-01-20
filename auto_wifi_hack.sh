@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.2.1 19/1/25 02:40
+# version: 3.2.1 20/1/25 13:50
 
 
 ### To Do ###
@@ -76,20 +76,19 @@ function check_wordlist() {
     else
         # Check if rockyou.gz exists, if yes, unzip it
         if [ -f "$rockyou_gz" ]; then
-            echo "rockyou.gz found. Unzipping..."
+            echo -e "\n\nrockyou.gz found. Unzipping..."
             sudo gzip -d "$rockyou_gz"
         else
-            echo -e "Downloading the rockyou file...\n"
+            echo -e "\n\nDownloading the rockyou file...\n"
             sudo wget -q -P $wordlists_dir https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt 
             wait
         fi
     fi
-    
     # Check if oui.txt exists - for vendors names
     if [ -f "$oui_file" ]; then
         echo
     else
-       echo -e "Downloading the OUI file...\n"
+       echo -e "\n\nDownloading OUI file - Vendors detailes...\n"
        wget -q https://raw.githubusercontent.com/Doksy/OUI-list-2025/main/oui.txt -O  "$targets_path"/oui.txt
        wait
     fi         
@@ -126,9 +125,7 @@ function adapter_config() {
 	        read -p "WiFi adapter not detected. Please enter the name of your WiFi adapter: " wifi_adapter
 	    fi
 	fi  	
-
 	echo -e "\e[1mWiFi adapter:\e[0m $wifi_adapter\nChanging $wifi_adapter to monitor mode"
-
 	sudo airmon-ng start "$wifi_adapter" > /dev/null 2>&1
 
 	# Find the new monitor mode adapter name
@@ -247,6 +244,9 @@ function network_scanner() {
 }
 
 
+# ------------------------------
+# Choose Network
+# ------------------------------
 function choose_network() {
     while :; do
         # Prompt the user to choose a row number
