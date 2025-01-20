@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.2.1 20/1/25 13:50
+# version: 3.3 21/1/25 03:25
 
 
 ### To Do ###
@@ -9,20 +9,20 @@
 # specific passwords lists for different vendors
 # functions to crack PMKID (using hcxpcapngtool..)
 # default vendors length (for example: ZTE - 8 capital and numbers) with hashcat
-# cracking using GPU
 # find attacks for WPA2-WPA3, WPA3
 
 
 # Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path And OUI file for vendors name of devices and routers (will help identify farther attacks).
 
-# **IMPORTANT** for Alfa AWUS036AXML wifi card don't run apt upgrade. or else the card won't work (I couldn't solve it with the Linux drivers that Alfa offered).
-# To enable 6Ghz run: "sudo iw reg set US" and reboot. to check if its enabled run: "iw list".
+# **IMPORTANT** for Alfa AWUS036AXML wifi card:
+# 	Don't run apt upgrade. or else the card won't work (I couldn't solve it with the Linux drivers that Alfa offered).
+# 	To enable 6Ghz run: "sudo iw reg set US" and reboot. to check if its enabled run: "iw list".
 
 
 
-# ------------------------------
+# ----------------
 # Variables
-# ------------------------------
+# ----------------
 UN=${SUDO_USER:-$(whoami)}
 current_date=$(date +"%d_%m_%y")
 targets_path="/home/$UN/Desktop/wifi_Targets"
@@ -32,7 +32,7 @@ rockyou_file="$wordlists_dir/rockyou.txt"
 rockyou_gz="$wordlists_dir/rockyou.txt.gz"
 oui_file="$targets_path/oui.txt"
 oui_vendor=""
-gpu_enabled=false # function not exist yet
+gpu_enabled=true # Enable GPU crack
 
 # Ensure required directories exist
 mkdir -p "$targets_path"
@@ -42,6 +42,7 @@ fi
 mkdir "$targets_path/Scan"
 touch "$targets_path/wifi_passwords.txt"	    
 sudo chown -R $UN:$UN $targets_path
+
 
 
 
@@ -57,6 +58,77 @@ function install_dependencies() {
             sudo apt install -y $package
         fi
     done
+}
+
+
+
+# -----------------
+# Enable GPU
+# -----------------
+function enable_gpu() {
+    # Check if running in a VM
+    if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
+        echo -e "\n⚠️  You are running inside a virtual machine. GPU acceleration may not be available."
+        return 1
+    fi
+
+    # Detect GPU
+    GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
+
+    if [[ -n "$GPU_INFO" ]]; then
+        # Extract only the GPU model (e.g., "GeForce RTX 2070 SUPER Mobile / Max-Q")
+        GPU_MODEL=$(echo "$GPU_INFO" | sed -E 's/.*\[(GeForce [^]]+)\].*/\1/')
+        echo -e "GPU detected: \e[1;32mNVIDIA $GPU_MODEL\e[0m"
+    else
+        echo -e "\n\e[1;31mNo NVIDIA GPU detected.\e[0m"
+        read -p "Would you like to install GPU drivers anyway? (Y/n): " response
+        if [[ ! "$response" =~ ^[Yy]$ ]]; then
+            echo -e "\nSkipping GPU driver installation."
+            return 1
+        fi
+    fi
+
+    # Check for CUDA
+    #echo -e "\n🔍 Checking for CUDA installation..."
+    if command -v nvidia-smi &>/dev/null; then
+        CUDA_VERSION=$(nvidia-smi | grep -i "CUDA Version" | awk '{print $6}')
+        echo -e "CUDA is installed. Version: \e[1;34m$CUDA_VERSION\e[0m"
+    else
+        echo -e "\n⚠️  CUDA is not detected."
+    fi
+
+    # Check if Hashcat detects the GPU
+    #echo -e "\nChecking if Hashcat detects the GPU..."
+    HASHCAT_INFO=$(hashcat -I | grep GPU 2>/dev/null)
+
+    if [[ -n "$HASHCAT_INFO" ]]; then
+        echo -e "Hashcat detects the GPU!\n"
+        return 0
+    else
+        echo -e "\n⚠️  Hashcat does not detect the GPU. Possible reasons:"
+        echo -e "   - Missing NVIDIA drivers"
+        echo -e "   - OpenCL not installed"
+        echo -e "   - CUDA not properly configured"
+    fi
+
+    # Ask user whether to install GPU drivers
+    read -p "Would you like to install NVIDIA GPU drivers? (Y/n): " response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        echo -e "\n📦 Installing NVIDIA drivers and CUDA..."
+        packages=("linux-headers-amd64" "nvidia-driver" "nvidia-cuda-toolkit")
+        for package in "${packages[@]}"; do
+            if ! dpkg -l | grep -q "^ii  $package "; then
+                echo -e "\nInstalling $package..."
+                sudo apt install -y "$package"
+            else
+                echo -e "✅ $package is already installed."
+            fi
+        done            
+
+        echo -e "\n\e[1;33mPlease reboot your system for changes to take effect.\e[0m"
+    else
+        echo -e "\nGPU driver installation skipped."
+    fi
 }
 
 
@@ -173,7 +245,6 @@ function network_scanner() {
 	# Append the client information to the end of the scan file
 	echo -e "\nStation MAC:            BSSID:\n$clients_content" >> "$scan_input"
 
-
 	# Display available WiFi networks
 	echo -e "\n\033[1;33mAvailable WiFi Networks:\033[0m\n"
 
@@ -225,8 +296,7 @@ function network_scanner() {
 	    else
 	        bars="\e[1;31m____\e[0m"  # Very Weak 
 	    fi
-	    
-	       
+
 	    # Use printf to format the fields and pipe into column for proper alignment
 	    if [[ -n "$vendor" ]]; then
 		printf "%-4s %-35s | %-7s | %-12s | %-7s | %-5s | %-5b | %-17s | %-1s\n" \
@@ -242,6 +312,7 @@ function network_scanner() {
 		    	    
         choose_network
 }
+
 
 
 # ------------------------------
@@ -330,11 +401,11 @@ function choose_network() {
         # If we only captured the handshake from previous scan
         if [ -d "$targets_path/$bssid_name" ]; then
             if sudo grep -q "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt"; then
-                echo -e "\033[1;32mHandshake found from previous scan! Cracking it..\033[0m\n"
+                echo -e "\033[1;32mHandshake found from previous scan!\033[0m\n"
                 sudo pkill aireplay-ng
                 sudo pkill airodump-ng
                 cleanup
-                dictionary_attack
+                choose_password_attack
                 exit 1   
             else
                 rm -r $targets_path/"$bssid_name" 
@@ -344,7 +415,6 @@ function choose_network() {
             mkdir $targets_path/"$bssid_name"           
         fi
 
-        # Validate network
         validate_network
         break  # Exit the loop once a valid network is chosen
     done
@@ -546,7 +616,6 @@ function dictionary_attack() {
 
 
 
-
 # ------------------------------
 # Password Cracking (Hashcat)
 # ------------------------------
@@ -679,11 +748,10 @@ function hashcat_crack() {
 
 
 
-
 # ------------------------------
 # GPU Cracking (Hashcat)
 # ------------------------------
-function gpu_crack() {
+function check_gpu() {
     if $gpu_enabled; then
         echo "Starting Hashcat GPU attack..."
         sudo hashcat -m 2500 "$targets_path/$bssid_name/$bssid_name-01.cap" "$rockyou_file" --force
@@ -728,6 +796,9 @@ function cleanup() {
 
 
 
+# ------------------------------
+# Choose Password Attack
+# ------------------------------
 function choose_password_attack() {
 
 	while true; do
@@ -760,7 +831,6 @@ function main_process() {
 	devices_scanner
 	deauth_attack
 	cleanup
-
 	choose_password_attack
 }
 
@@ -771,6 +841,9 @@ function main_process() {
 # ------------------------------
 install_dependencies
 check_wordlist
+if $gpu_enabled; then
+    enable_gpu
+fi
 adapter_config
 main_process
 
