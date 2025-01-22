@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# version: 3.4 23/1/25 02:25
+# version: 3.4 23/1/25 02:50
 
+
+### FIX ###
+# delay between scan to output
 
 ### To Do ###
 # Add more Hashcat options. l+d, l+u+d. or auto configure combinations. + Add possibilities calc. + show the mask better. + show empty mask at the beginning.
@@ -572,110 +575,98 @@ function brute-force_attack() {
     
     # Ask user for password length
     while true; do
-            read -p "Enter password length (Wi-Fi min: 8): " password_length
+        read -p "Enter password length (Wi-Fi min: 8): " password_length
 
-	    # If the user presses Enter, set password_length to 8
-	    if [[ -z "$password_length" ]]; then
-		password_length=8
-		echo "default is 8"
-		break
-	    fi
+        # If the user presses Enter, set password_length to 8
+        if [[ -z "$password_length" ]]; then
+            password_length=8
+            echo "default is 8"
+            break
+        fi
 
-	    # Validate password length
-	    if [[ "$password_length" =~ ^[0-9]+$ ]] && [[ "$password_length" -gt 0 ]]; then
-		break
-	    else
-		echo "Invalid password length. Please enter a positive number."
-	    fi
+        # Validate password length
+        if [[ "$password_length" =~ ^[0-9]+$ ]] && [[ "$password_length" -gt 0 ]]; then
+            break
+        else
+            echo "Invalid password length. Please enter a positive number."
+        fi
     done
 
     # Ask user if they want to try every possible combination or customize each position
     while true; do
+        full_mask=""
 
-            full_mask=""
+        echo -e "\n\e[1mChoose how to run the Brute-Force:\e[0m"
+        echo -e "1) Try every possible combination           (ABC-abc-123-!@#)   |   $password_length^94 possibilities.\n"
+        echo -e "2) Customize each position of the password:"
+        echo "   1. Uppercase                    ?u   -   (ABC)"
+        echo "   2. Lowercase                    ?l   -   (abc)"
+        echo "   3. Numbers                      ?d   -   (123)"
+        echo "   4. Special character            ?s   -   (!@#)"
+        echo "   5. Uppercase + Numbers          ?u?d -   (ABC-123)"
+        echo "   6. All character types          ?a   -   (ABC-abc-123-!@#)"
+        echo "   7. Enter a specific character:  __"
+        echo -e "\n"
 
-            echo -e "\n\e[1mChoose how to run the Brute-Force:\e[0m"
-            echo -e "1) Try every possible combination                (ABC-abc-123-!@#)   |   $password_length^94 possibilities.\n"
-            echo -e "2) Customize each position of the password:"
-            echo "	1. Uppercase                    ?u   -   (ABC)"
-            echo "	2. Lowercase                    ?l   -   (abc)"
-            echo "	3. Numbers                      ?d   -   (123)"
-            echo "	4. Special character            ?s   -   (!@#)"
-            echo "	5. Uppercase + Numbers          ?u?d -   (ABC-123)"
-            echo "	6. All character types          ?a   -   (ABC-abc-123-!@#)"
-            echo "	7. Enter a specific character:  __"
-            echo -e "\n"
+        read -p "Enter your choice (1-2): " option
 
-	    read -p "Enter your choice (1-2): " option
-        
-		if [[ "$option" -eq 1 ]]; then
-		    echo -e "\nWe will check all possible characters (ABC-abc-123-!@#) for each position."
-		    char_set="?a"
-		    
-		    # Generate the full mask
-		    for (( i=0; i<password_length; i++ )); do
-		        full_mask+="$char_set"
-		    done
-		    break
-		elif [[ "$option" -eq 2 ]]; then
+        if [[ "$option" -eq 1 ]]; then
+            echo -e "\nWe will check all possible characters (ABC-abc-123-!@#) for each position."
+            char_set="?a"
 
-		    # Initialize an array for current positions
-		    positions=()
-		    for (( i=1; i<=password_length; i++ )); do
-		        # Clear the previous line and update the mask
-		        tput cuu1; tput el; tput cuu1; tput el;
-			echo -n -e "\e[1mCurrent mask:\e[0m "
-		        for pos in "${positions[@]}"; do
-			   echo -n -e "\e[1;36m[\e[0m \e[1;31m$pos\e[1;36m \e[1;36m]\e[0m "
-		        done
-		        echo
-		        while true; do
-		            read -p "Choose an option for position $i/$password_length  (Choose 1-7): " choice
-		            case "$choice" in
-		                1) positions+=("?u"); break;; 
-		                2) positions+=("?l"); break;; 
-		                3) positions+=("?d"); break;;
-		                4) positions+=("?s"); break;;
-		                5)                             
-		                    positions+=("?1")  # Adding the custom charset for Uppercase + Numbers
-		                    charset="-1 ?u?d"   # Define the custom charset
-		                    break;;  
-		                6) positions+=("?a"); break;;                                                                                    
-		                7) 
-		                    while true; do
-		                        read -p "  Enter the specific character for position $i: " specific_char
-		                        if [[ ${#specific_char} -eq 1 ]]; then
-		                            positions+=("$specific_char")
-		                            tput cuu1; tput el  # Clear the input line
-		                            tput cuu1; tput el  # Clear the input line
-		                            tput cuu1; tput el  # Clear the input line
-					    echo -n "Current mask: "
-					    for pos in "${positions[@]}"; do
-						echo -n -e "\e[1;36m[\e[0m \e[1;31m$pos\e[1;36m \e[1;36m]\e[0m "
-					    done
-					    echo
-					    ((i++))
-					    break
-		                        else
-		                            tput cuu1; tput el  # Move up and clear error line
-		                            tput cuu1; tput el  # Move up again and clear input line
-		                            echo -e "\e[1;31mInvalid input!\e[0m Please enter exactly ONE character."
-		                        fi
-		                    done
-		                    ;;
-		                *) echo "Invalid choice. Please enter a valid option."
-		                   tput cuu1; tput el 
-		                   tput cuu1; tput el
-		                   ;;
-		            esac
-		        done
-		    done
-		    full_mask=$(IFS=; echo "${positions[*]}")
-		    break 
-                 
-		else
-		    echo "Invalid option. Please enter 1-2."
-		fi
+            # Generate the full mask
+            for (( i=0; i<password_length; i++ )); do
+                full_mask+="$char_set"
+            done
+            break
+        elif [[ "$option" -eq 2 ]]; then
+            positions=()
+            for (( i=1; i<=password_length; i++ )); do
+                tput cuu1; tput el; tput cuu1; tput el;
+                echo -n -e "\e[1mCurrent mask:\e[0m "
+                for pos in "${positions[@]}"; do
+                    echo -n -e "\e[1;36m[\e[0m \e[1;31m$pos\e[1;36m \e[1;36m]\e[0m "
+                done
+                echo
+
+                while true; do
+                    read -p "Choose an option for position $i/$password_length  (Choose 1-7): " choice
+                    case "$choice" in
+                        1) positions+=("?u"); break;; 
+                        2) positions+=("?l"); break;; 
+                        3) positions+=("?d"); break;;
+                        4) positions+=("?s"); break;;
+                        5) positions+=("?1"); charset="-1 ?u?d"; break;;  
+                        6) positions+=("?a"); break;;                                                                                     
+                        7) 
+                            while true; do
+                                read -p "  Enter the specific character for position $i: " specific_char
+                                if [[ ${#specific_char} -eq 1 ]]; then
+                                    positions+=("$specific_char")
+                                    tput cuu1; tput el; tput cuu1; tput el; tput cuu1; tput el;
+                                    echo -n "Current mask: "
+                                    for pos in "${positions[@]}"; do
+                                        echo -n -e "\e[1;36m[\e[0m \e[1;31m$pos\e[1;36m \e[1;36m]\e[0m "
+                                    done
+                                    echo
+                                    ((i++))
+                                    break
+                                else
+                                    tput cuu1; tput el; tput cuu1; tput el;
+                                    echo -e "\e[1;31mInvalid input!\e[0m Please enter exactly ONE character."
+                                fi
+                            done
+                            ;;
+                        *) echo "Invalid choice. Please enter a valid option."
+                           tput cuu1; tput el; tput cuu1; tput el;;
+                    esac
+                done
+            done
+            full_mask=$(IFS=; echo "${positions[*]}")
+            break 
+        else
+            echo "Invalid option. Please enter 1-2."
+        fi
     done
 
     echo -e "\n\n\033[1;33mGenerated Hashcat mask:\033[0m \033[1;31m\033[1m$full_mask\033[0m\n\n"
