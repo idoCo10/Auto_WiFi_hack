@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.4 23/1/25 02:50
+# version: 3.4.1 25/1/25 01:04
 
 
 ### FIX ###
@@ -67,6 +67,7 @@ function install_dependencies() {
     packages=("aircrack-ng" "gnome-terminal" "wget" "hashcat" "hcxtools" "gawk" "dbus-x11")
     for package in "${packages[@]}"; do
         if ! dpkg -l | grep -q "^ii  $package "; then
+            echo -e "\nUpdating the repositories.."
             sudo apt update
             echo "$package is not installed. Installing..."
             sudo apt install -y $package
@@ -98,6 +99,16 @@ function check_wordlist() {
             wait
         fi
     fi
+    
+    # Remove passwords less than 8 length from rockyou.txt, because wifi pass is minimum 8 length.
+    if [ -f "$wordlists_dir/rockyou-8.txt" ]; then
+        :
+    else
+        echo "Filtering rockyou.txt for 8+ character passwords..."    
+        grep -E '^.{8,}$' "$rockyou_file" > "$wordlists_dir/rockyou-8.txt" # Create filtered wordlist (8+ chars only)
+        rockyou_file="$wordlists_dir/rockyou-8.txt"
+    fi
+
     # Check if oui.txt exists - for vendors names
     if [ -f "$oui_file" ]; then
         echo
@@ -159,7 +170,7 @@ function adapter_config() {
 # ------------------------------
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=15
+        countdown_duration=3
         sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -215,7 +226,7 @@ function network_scanner() {
 	    ssid=$(echo "$line" | cut -d',' -f6 | tr -d '|')  # remove "|" from SSID name
 
 	    # Get the vendor dynamically
-	    vendor=$(get_oui_vendor_scan "$mac")
+	    vendor=$(get_oui_vendor "$mac")
 	    # Get the number of clients for this BSSID
 	    client_count=${client_counts["$mac"]}
 	    clients_display=""
@@ -284,14 +295,14 @@ function choose_network() {
         encryption=$(echo "$chosen_row" | awk -F', ' '{print $3}')
         power=$(echo "$chosen_row" | awk -F', ' '{print $4}')
         bssid_name=$(echo "$chosen_row" | awk -F', ' '{print $5}')
+        bssid_name_original=${bssid_name}
 
         # Remove "/" from bssid name
         if [[ $bssid_name == *"/"* ]]; then
-            bssid_name_original=${bssid_name}
             bssid_name=${bssid_name//\//}
         fi
 
-        get_oui_vendor
+        oui_vendor=$(get_oui_vendor)
 
         # Echo values
         echo -e "\033[1;31m\033[1mBSSID Name:\033[0m $bssid_name_original"
@@ -365,49 +376,51 @@ function choose_network() {
 # Validate Network
 # ------------------------------
 function validate_network() {
+    echo -e "\e[1mValidating network:\e[0m"
+    
+    # Open airodump-ng in a hidden terminal
+    gnome-terminal --geometry=105x15-10000-10000 -- script -c "sudo airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter"mon"" "$targets_path/$bssid_name/airodump_output.txt"
 
-        echo -e "\e[1mValidating network:\e[0m"
-        gnome-terminal --geometry=105x15-10000-10000 -- script -c "sudo airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter"mon"" "$targets_path/$bssid_name/airodump_output.txt"
-	found=0
-	for (( i=0; i<15; i++ )); do
-	    if [ "$(grep -c "$bssid_address" "$targets_path/$bssid_name/airodump_output.txt")" -ge 2 ]; then
-		found=1
-		echo -e "Network available! \n"
-		break
-	    fi
-	    sleep 1
-	done
+    found=0
+    echo -n "Checking"
+    
+    for (( i=0; i<15; i++ )); do
+        if [ "$(grep -c "$bssid_address" "$targets_path/$bssid_name/airodump_output.txt")" -ge 2 ]; then
+            found=1
+            echo -e "\n\e[1;32mNetwork available!\e[0m"
+            break
+        fi
+        echo -n "."  # Show progress dots
+        sleep 1
+    done
 
-	if [ $found -eq 0 ]; then
-	    sudo pkill aireplay-ng
-	    sudo pkill airodump-ng
-	    echo -e "\033[1mNetwork appears to be offline now.\033[0m"
-	    another_scan_prompt
-	fi
+    echo ""  # New line after dots
+
+    if [ $found -eq 0 ]; then
+        sudo pkill aireplay-ng
+        sudo pkill airodump-ng
+        echo -e "\e[1;31mNetwork appears to be offline now.\e[0m"
+        another_scan_prompt
+    fi
 }
+
 
 
 # ------------------------------------
 # Get the vendors names of the devices
 # ------------------------------------
-function get_oui_vendor_scan() {
+function get_oui_vendor() {
     local mac="$1"
+    # If no argument is provided, use the global variable bssid_address
+    if [[ -z "$mac" ]]; then
+        mac="$bssid_address"
+    fi
     local oui=$(echo "$mac" | awk -F':' '{print toupper($1 ":" $2 ":" $3)}') # Extract OUI in uppercase
     if [[ -f $oui_file ]]; then
-        # Get the vendor name if it exists
         local vendor=$(grep -i "^$oui" "$oui_file" | awk '{$1=""; print $0}' | xargs | tr -d '\r')
         echo "$vendor"
     else
         echo ""
-    fi
-}
-# Function to check the OUI and get the vendor name
-function get_oui_vendor() {
-    local oui=$(echo "$bssid_address" | awk -F':' '{print toupper($1 ":" $2 ":" $3)}') # Extract OUI in uppercase
-    if [[ -f $oui_file ]]; then
-        oui_vendor=$(grep -i "^$oui" "$oui_file" | awk '{$1=""; print $0}' | xargs)
-    else
-        oui_vendor=""
     fi
 }
 
@@ -417,7 +430,6 @@ function get_oui_vendor() {
 # ------------------------------
 function devices_scanner() {
     echo -e "\e[1m\nStart scanning for devices ->>\e[0m"
-    sleep 2
 
     duration=60  # Set countdown time (seconds)
     
@@ -429,7 +441,7 @@ function devices_scanner() {
             echo -e "\n\n\033[1;33mDevices Found:\033[0m" 
             echo -e "$target_devices" | tr ' ' '\n' | while read -r mac; do
                 if [[ -n "$mac" ]]; then
-                    vendor=$(get_oui_vendor_scan "$mac")
+                    vendor=$(get_oui_vendor "$mac")
                     if [[ -n "$vendor" ]]; then
                         echo -e "$mac - $vendor"
                     else
@@ -492,7 +504,7 @@ function deauth_attack() {
 		echo -e "$target_devices" | tr ' ' '\n' | while read -r mac; do
 		    if [[ -n "$mac" ]]; then
 			# Call the function to get the vendor
-			vendor=$(get_oui_vendor_scan "$mac")
+			vendor=$(get_oui_vendor "$mac")
 			# Print the MAC with its vendor
 			if [[ -n "$vendor" ]]; then
 			    echo "$mac - $vendor"
@@ -603,7 +615,7 @@ function brute-force_attack() {
         echo "   2. Lowercase                    ?l   -   (abc)"
         echo "   3. Numbers                      ?d   -   (123)"
         echo "   4. Special character            ?s   -   (!@#)"
-        echo "   5. Uppercase + Numbers          ?u?d -   (ABC-123)"
+        echo "   5. Uppercase + Numbers          ?1   -   (ABC-123)"
         echo "   6. All character types          ?a   -   (ABC-abc-123-!@#)"
         echo "   7. Enter a specific character:  __"
         echo -e "\n"
@@ -712,7 +724,7 @@ function brute-force_attack() {
 function enable_gpu() {
     # Check if running in a VM
     if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
-        echo -e "You are running inside a virtual machine. GPU will not be available.\n"
+        echo -e "\nYou are running inside a virtual machine. GPU acceleration may not be available."
         return 1
     fi
 
