@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.4.1 25/1/25 01:04
+# version: 3.4.1 25/1/25 01:20
 
 
 ### FIX ###
@@ -170,7 +170,7 @@ function adapter_config() {
 # ------------------------------
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=20
+        countdown_duration=3
         sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -529,7 +529,7 @@ function deauth_attack() {
 		done
 	    # after 10 unseccessfull attempts, quit the script:
 	    if [ "$i" == "$counter" ]; then
-	    	echo -e "\033[1m\nNo handshake obtained within 1.5 minutes. Try again.\033[0m"
+	    	echo -e "\n\033[1;31m\033[1mNo handshake obtained.\033[0m \033[1mTry again.\033[0m"
 	    	sudo pkill aireplay-ng
 		sudo pkill airodump-ng
 		rm -r $targets_path/"$bssid_name"
