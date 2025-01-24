@@ -712,7 +712,7 @@ function brute-force_attack() {
 function enable_gpu() {
     # Check if running in a VM
     if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
-        echo -e "\nYou are running inside a virtual machine. GPU acceleration may not be available."
+        echo -e "You are running inside a virtual machine. GPU will not be available.\n"
         return 1
     fi
 
