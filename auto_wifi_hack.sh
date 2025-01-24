@@ -106,8 +106,8 @@ function check_wordlist() {
     else
         echo "Filtering rockyou.txt for 8+ character passwords..."    
         grep -E '^.{8,}$' "$rockyou_file" > "$wordlists_dir/rockyou-8.txt" # Create filtered wordlist (8+ chars only)
-        rockyou_file="$wordlists_dir/rockyou-8.txt"
     fi
+    rockyou_file="$wordlists_dir/rockyou-8.txt"
 
     # Check if oui.txt exists - for vendors names
     if [ -f "$oui_file" ]; then
