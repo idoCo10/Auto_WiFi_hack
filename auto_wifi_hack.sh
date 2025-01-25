@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.4.2 25/1/25 03:37
+# version: 3.4.2 26/1/25 01:37
 
 
 ### FIX ###
@@ -170,7 +170,7 @@ function adapter_config() {
 # ------------------------------
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=20
+        countdown_duration=5
         sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -570,7 +570,7 @@ function dictionary_attack() {
 		another_scan_prompt
 		;;
 	    *)
-		echo "Invalid choice. Please enter 'y' or 'n'."
+		echo -e "\e[1;31mInvalid choice.\e[0m Please enter 'y' or 'n'."
 		;;
 	esac        
     fi
@@ -602,22 +602,22 @@ function brute-force_attack() {
     while true; do
         full_mask=""
         echo -e "\n\e[1mChoose how to run the Brute-Force:\e[0m"
-        echo -e "1) Try every possible combination          ?a   -   (ABC-abc-123-!@#)   |   $password_length^94 possibilities.\n"
-        echo -e "2) Customize each position of the password:"
-        echo "   1.  Uppercase                           ?u   -   (ABC)"
-        echo "   2.  Lowercase                           ?l   -   (abc)"
-        echo "   3.  Numbers                             ?d   -   (123)"
-        echo "   4.  Special character                   ?s   -   (!@#)"
-        echo "   5.  Uppercase + Numbers                 ?1   -   (ABC-123)"
-        echo "   6.  Lowercase + Numbers                 ?2   -   (abc-123)"
-        echo "   7.  Uppercase + Lowercase               ?3   -   (ABC-abc)"
-        echo "   8.  Uppercase + Lowercase + Numbers     ?4   -   (ABC-abc-123)"        
-        echo "   9.  All character types                 ?a   -   (ABC-abc-123-!@#)"
+        echo -e "\e[1;31m1)\e[0m Try every possible combination                     ?a   -   (ABC-abc-123-!@#)   |   $password_length^94 possibilities.\n"
+        echo -e "\e[1;31m2)\e[0m Customize each position of the password:"
+        echo "   1.  Uppercase                                      ?u   -   (ABC)"
+        echo "   2.  Lowercase                                      ?l   -   (abc)"
+        echo "   3.  Numbers                                        ?d   -   (123)"
+        echo "   4.  Special characters                             ?s   -   (!@#)"
+        echo "   5.  Uppercase + Numbers                            ?1   -   (ABC-123)"
+        echo "   6.  Lowercase + Numbers                            ?2   -   (abc-123)"
+        echo "   7.  Uppercase + Lowercase                          ?3   -   (ABC-abc)"
+        echo "   8.  Uppercase + Lowercase + Numbers                ?4   -   (ABC-abc-123)"        
+        echo "   9.  Uppercase + Lowercase + Numbers + specials     ?a   -   (ABC-abc-123-!@#)"
         echo "   10. Enter a specific character: __"
         echo -e "\n"
 
 	while true; do
-	    echo -n "Enter your choice (1-2): "
+	    echo -n -e "Enter your choice (\e[1;31m1\e[0m-\e[1;31m2\e[0m): "
 	    read option
 	    if [[ "$option" -eq 1 || "$option" -eq 2 ]]; then
 		break
@@ -718,7 +718,7 @@ function brute-force_attack() {
                 another_scan_prompt
                 ;;
             *)
-                echo "Invalid choice. Please enter 'y' or 'n'."
+                echo -e "\e[1;31mInvalid choice.\e[0m Please enter 'y' or 'n'."
                 ;;
         esac        
     fi    
@@ -865,8 +865,3 @@ install_dependencies
 check_wordlist
 enable_gpu
 main_process
-
-
-
-
-
