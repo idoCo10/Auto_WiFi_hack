@@ -12,7 +12,8 @@ Make sure you're connected to the internet before running the script to download
 - Downloads the **OUI file** for identifying the vendors of APs (routers and devices).
 - Automatically find the WIFI adapter and sets it to into monitor mode.
 - Scan all networks around you:
-  ![Scan](assets/scan.png)
+  
+    ![Scan](assets/scan.png)
   
 - Choose network to attack.
 - The script will scan all devices that connected to that network and Deauth them from the router.
