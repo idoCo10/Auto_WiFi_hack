@@ -39,12 +39,15 @@ Make sure you're connected to the internet before running the script to download
 ![Scan](assets/scan.png)
 
 - Deauth attack:
+  
 ![Deauth](assets/Deauth.png)
 
 - Rockyou crack:
+  
 ![rockyou](assets/rockyou_cracked.png)
 
 - Hashcat Brute-Force:
+
 ![hash2](assets/hashcat2.png)
 ![hash4](assets/hashcat4.png)
 
