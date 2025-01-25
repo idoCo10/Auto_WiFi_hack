@@ -1,8 +1,9 @@
 # Auto WiFi Password Hack Script
 
-This script is designed to crack WiFi passwords by capturing the EAPOL handshake and then using the **rockyou** wordlist and **hashcat** for brute-forcing. If a GPU is available, it utilizes it for faster cracking.
+This script is designed to crack WiFi passwords by capturing the EAPOL handshake and then using the **rockyou** wordlist and **hashcat** for brute-forcing. 
+If a GPU is available, it utilizes it for faster cracking.
 
-Start the script connecting to internet in order to download the required dependencies.
+Make sure you're connected to the internet before running the script to download the required dependencies.
 
 ## Features
 - Automatically installs all dependencies.
