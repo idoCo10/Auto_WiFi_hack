@@ -22,11 +22,17 @@ Make sure you're connected to the internet before running the script to download
   
 - After capturing the EAPOL the user will choose if to crack it with rockyou wordlist or brute-force with Hashcat.
 - The crcking will utilizes GPU for faster cracking if available.
+
+    Rockyou dictionary attack when found the WiFi password (run in gnome-terminal for better-looking).
+    ![rockyou](assets/rockyou_cracked.png)
+  
 - If you choose to brute-force I customized Hashcat for easy options, for example you can choose the length of the password and what characters/numbers/specials will be in each position.
 
     When customizing each position of the bruteforce:
 
     ![hash4](assets/hashcat4.png)
+
+    Note: The actual Hashcat Brute-Force run in gnome-terminal (the script open it on new terminal for better-looking).
   
 - If the password found the script will write it to the file "wifi_passwords.txt" in the scan folder.
 
@@ -43,20 +49,6 @@ Make sure you're connected to the internet before running the script to download
    cd Auto_WiFi_hack
    sudo chmod +x Auto_WiFi_hack.sh
    sudo ./Auto_WiFi_hack.sh
-
-## Demo
-
-- Rockyou crack:
-  
-![rockyou](assets/rockyou_cracked.png)
-
-- Hashcat Brute-Force:
-
-![hash2](assets/hashcat2.png)
-
-When customizing each position of the bruteforce:
-
-![hash4](assets/hashcat4.png)
 
 
 
