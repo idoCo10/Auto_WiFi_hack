@@ -31,8 +31,8 @@ Start the script connecting to internet in order to download the required depend
    ```bash
    git clone https://github.com/idoCo10/Auto_WiFi_hack.git
    cd Auto_WiFi_hack
-   sudo chmod +x Auto_WiFi_hack
-   sudo ./Auto_WiFi_hack
+   sudo chmod +x Auto_WiFi_hack.sh
+   sudo ./Auto_WiFi_hack.sh
 
 Legal Disclaimer
 This tool is for authorized penetration testing and educational purposes only.
