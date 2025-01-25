@@ -35,6 +35,7 @@ Make sure you're connected to the internet before running the script to download
    sudo ./Auto_WiFi_hack.sh
 
 ## The script
+Scan:
 ![Scan](assets/scan.png)
 
 
