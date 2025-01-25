@@ -49,6 +49,9 @@ Make sure you're connected to the internet before running the script to download
 - Hashcat Brute-Force:
 
 ![hash2](assets/hashcat2.png)
+
+When customizing each position of the bruteforce:
+
 ![hash4](assets/hashcat4.png)
 
 
