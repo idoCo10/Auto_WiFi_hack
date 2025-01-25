@@ -27,7 +27,6 @@ Make sure you're connected to the internet before running the script to download
 - **hashcat** and **rockyou** wordlist (automatically handled by the script).
 
 ## Installation & Usage
-
 1. Clone this repository:
    ```bash
    git clone https://github.com/idoCo10/Auto_WiFi_hack.git
@@ -35,7 +34,13 @@ Make sure you're connected to the internet before running the script to download
    sudo chmod +x Auto_WiFi_hack.sh
    sudo ./Auto_WiFi_hack.sh
 
-Legal Disclaimer
+## The script
+![Scan](assets/scan.png)
+
+
+
+
+## Legal Disclaimer
 This tool is for authorized penetration testing and educational purposes only.
 Using this script against networks without explicit permission is illegal and violates ethical standards.
 The authors are not responsible for misuse of this tool.
