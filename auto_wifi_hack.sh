@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# version: 3.4.3 26/1/25 01:37
+# version: 3.4.3 26/1/25 04:44
 
 
 ### FIX ###
 # delay between scan to output
 
 ### To Do ###
-# Add more Hashcat options. l+d, l+u+d. or auto configure combinations. + Add possibilities calc. + show the mask better. + show empty mask at the beginning.
+# Add Hashcat options for auto configure combinations. + Add possibilities calc. + show the mask better. + option to remove wrong mask.
 # run all networks or range of them at the same time.
 # add more dictioneries than rockyou?
 # specific passwords lists for different vendors
@@ -614,7 +614,7 @@ function brute-force_attack() {
         echo "   8.  Uppercase + Lowercase + Numbers                ?4   -   (ABC-abc-123)"        
         echo "   9.  Uppercase + Lowercase + Numbers + specials     ?a   -   (ABC-abc-123-!@#)"
         echo "   10. Enter a specific character: __"
-        echo -e "\n"
+        echo -e "\n\n"
 
 	while true; do
 	    echo -n -e "Enter your choice (\e[1;31m1\e[0m-\e[1;31m2\e[0m): "
@@ -639,38 +639,45 @@ function brute-force_attack() {
         elif [[ "$option" -eq 2 ]]; then
             positions=()
             charset=""
+ 
+            tput cuu1; tput el; tput cuu1; tput el;
+            echo -n -e "\e[1mCurrent mask:	\e[0m "
+            for (( j=1; j<=password_length; j++ )); do
+                if [[ -z "${positions[j-1]}" ]]; then
+                    echo -n -e "$j.\e[1;36m[\e[0m  \e[1;36m]\e[0m "
+                else
+                    echo -n -e "$j.\e[1;36m[\e[0m \e[1;31m${positions[j-1]}\e[1;36m \e[1;36m]\e[0m "
+                fi
+            done
+            echo   
+ 
             for (( i=1; i<=password_length; i++ )); do
-                tput cuu1; tput el; tput cuu1; tput el;
-                echo -n -e "\e[1mCurrent mask:\e[0m "
-                for pos in "${positions[@]}"; do
-                    echo -n -e "\e[1;36m[\e[0m \e[1;31m$pos\e[1;36m \e[1;36m]\e[0m "
-                done
-                echo
-
-                while true; do
                     read -p "Choose an option for position $i/$password_length  (Choose 1-10): " choice
                     case "$choice" in
-                        1) positions+=("?u"); break;; 
-                        2) positions+=("?l"); break;; 
-                        3) positions+=("?d"); break;;
-                        4) positions+=("?s"); break;;
-                        5) positions+=("?1"); charset+="-1 ?u?d "; break;;  
-                        6) positions+=("?2"); charset+="-2 ?l?d "; break;;
-                        7) positions+=("?3"); charset+="-3 ?u?l "; break;;
-                        8) positions+=("?4"); charset+="-4 ?u?l?d "; break;;
-                        9) positions+=("?a"); break;;                         
+                        1) positions+=("?u");; 
+                        2) positions+=("?l");; 
+                        3) positions+=("?d");;
+                        4) positions+=("?s");;
+                        5) positions+=("?1"); charset+="-1 ?u?d ";;  
+                        6) positions+=("?2"); charset+="-2 ?l?d ";;
+                        7) positions+=("?3"); charset+="-3 ?u?l ";;
+                        8) positions+=("?4"); charset+="-4 ?u?l?d ";;
+                        9) positions+=("?a");;                         
                         10)
                             while true; do
                                 read -p "  Enter the specific character for position $i: " specific_char
                                 if [[ ${#specific_char} -eq 1 ]]; then
                                     positions+=("$specific_char")
-                                    tput cuu1; tput el; tput cuu1; tput el; tput cuu1; tput el;
-                                    echo -n "Current mask: "
-                                    for pos in "${positions[@]}"; do
-                                        echo -n -e "\e[1;36m[\e[0m \e[1;31m$pos\e[1;36m \e[1;36m]\e[0m "
-                                    done
+                                    tput cuu1; tput el; tput cuu1; tput el; 
+                                    echo -n -e "\e[1mCurrent mask:	\e[0m "
+					for (( j=1; j<=password_length; j++ )); do
+					    if [[ -z "${positions[j-1]}" ]]; then
+						echo -n -e "$j.\e[1;36m[\e[0m  \e[1;36m]\e[0m "
+					    else
+						echo -n -e "$j.\e[1;36m[\e[0m \e[1;31m${positions[j-1]}\e[1;36m \e[1;36m]\e[0m "
+					    fi
+					done
                                     echo
-                                    ((i++))
                                     break
                                 else
                                     tput cuu1; tput el; tput cuu1; tput el;
@@ -679,9 +686,20 @@ function brute-force_attack() {
                             done
                             ;;
                         *) echo -e "\e[1;31mInvalid choice!\e[0m Please enter a valid option (1-10)." && sleep 2;
-                           tput cuu1; tput el; tput cuu1; tput el;;
+                           tput cuu1; tput el;
+                           ((i--));;
                     esac
+           
+                tput cuu1; tput el; tput cuu1; tput el;
+                echo -n -e "\e[1mCurrent mask:	\e[0m "
+                for (( j=1; j<=password_length; j++ )); do
+                    if [[ -z "${positions[j-1]}" ]]; then
+                        echo -n -e "$j.\e[1;36m[\e[0m  \e[1;36m]\e[0m "
+                    else
+                        echo -n -e "$j.\e[1;36m[\e[0m \e[1;31m${positions[j-1]}\e[1;36m \e[1;36m]\e[0m "
+                    fi
                 done
+                echo                   
             done
             full_mask=$(IFS=; echo "${positions[*]}")
             break
