@@ -24,7 +24,7 @@ Make sure you're connected to the internet before running the script to download
 - The crcking will utilizes GPU for faster cracking if available.
 
     Rockyou dictionary attack when found the WiFi password (run in gnome-terminal for better-looking).
-    ![rockyou](assets/rockyou_cracked.png)
+    <img src="assets/rockyou_cracked.png" width="40%">
   
 - If you choose to brute-force I customized Hashcat for easy options, for example you can choose the length of the password and what characters/numbers/specials will be in each position.
 
