@@ -18,7 +18,7 @@ Make sure you're connected to the internet before running the script to download
 - The script will scan all devices that connected to that network and Deauth them from the router.
 - The script will attempt to captures the EAPOL handshake of WiFi networks.
 
-    ![Deauth](assets/Deauth.png)
+    <img src="assets/Deauth.png" width="300" height="200">
   
 - After capturing the EAPOL the user will choose if to crack it with rockyou wordlist or brute-force with Hashcat.
 - The crcking will utilizes GPU for faster cracking if available.
