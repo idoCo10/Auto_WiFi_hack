@@ -13,7 +13,7 @@ Make sure you're connected to the internet before running the script to download
 - Automatically find the WIFI adapter and sets it to into monitor mode.
 - Scan all networks around you and choose network to attack:
   
-    <img src="assets/scan.png" width="120%">
+    <img src="assets/scan.png" width="130%">
   
 - The script will scan all devices that connected to that network and Deauth them from the router.
 - The script will attempt to captures the EAPOL handshake of WiFi networks.
