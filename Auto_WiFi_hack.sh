@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.5.3 20/5/25 01:30
+# version: 3.5.3 20/5/25 02:00
 
 
 ### Changlog ###
@@ -285,10 +285,10 @@ function network_scanner() {
 
 	    # Use printf to format the fields and pipe into column for proper alignment
 	    if [[ -n "$vendor" ]]; then
-		printf "%-4s %-35s | %-7s | %-12b | %-7s | %-5s | %-5b | %-17s | %-1s\n" \
+		printf "%-4s %-35s | %-7s | %-21b | %-7s | %-5s | %-5b | %-17s | %-1s\n" \
 		    "$index." "$ssid" "$clients_display" "$encryption_color" "$channel" "$power" "$bars" "$mac" "$vendor"
 	    else
-		printf "%-4s %-35s | %-7s | %-12b | %-7s | %-5s | %-5b | %-17s\n" \
+		printf "%-4s %-35s | %-7s | %-21b | %-7s | %-5s | %-5b | %-17s\n" \
 		    "$index." "$ssid" "$clients_display" "$encryption_color" "$channel" "$power" "$bars" "$mac"
 	    fi
 	done | column -t -s "|"
