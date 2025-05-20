@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.5.2 21/5/25 00:30
+# version: 3.5.3 20/5/25 01:30
 
 
 ### Changlog ###
@@ -185,7 +185,7 @@ function spoof_adapter_mac() {
 # ------------------------------
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=15
+        countdown_duration=5
         sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -263,13 +263,33 @@ function network_scanner() {
 	        bars="\e[1;31m____\e[0m"  # Very Weak 
 	    fi
 
+
+	    # Colorize encryption type using if-elif, replacing with colorized label
+	    temp_encryption=$encryption
+
+	    if [[ "$temp_encryption" == "WPA3" ]]; then
+	        encryption_color="\e[1;31mWPA3\e[0m"  # Red
+	    elif [[ "$temp_encryption" == "WPA3 WPA2" || "$temp_encryption" == "WPA2 WPA3" ]]; then
+	        encryption_color="\e[91mWPA3 WPA2\e[0m"  # Red
+	    elif [[ "$temp_encryption" == "WPA2" ]]; then
+	        encryption_color="\e[93mWPA2\e[0m"  # Orange
+	    elif [[ "$temp_encryption" == "WPA2 WPA" || "$temp_encryption" == "WPA WPA2" ]]; then
+	        encryption_color="\e[96mWPA2 WPA\e[0m"  # Cyan
+	    elif [[ "$temp_encryption" == "OPN" || "$temp_encryption" == "Open" ]]; then
+	        encryption_color="\e[92mOPEN\e[0m"  # Green
+	    else
+	        encryption_color="$temp_encryption"  # Default color
+	    fi
+
+
+
 	    # Use printf to format the fields and pipe into column for proper alignment
 	    if [[ -n "$vendor" ]]; then
-		printf "%-4s %-35s | %-7s | %-12s | %-7s | %-5s | %-5b | %-17s | %-1s\n" \
-		    "$index." "$ssid" "$clients_display" "$encryption" "$channel" "$power" "$bars" "$mac" "$vendor"
+		printf "%-4s %-35s | %-7s | %-12b | %-7s | %-5s | %-5b | %-17s | %-1s\n" \
+		    "$index." "$ssid" "$clients_display" "$encryption_color" "$channel" "$power" "$bars" "$mac" "$vendor"
 	    else
-		printf "%-4s %-35s | %-7s | %-12s | %-7s | %-5s | %-5b | %-17s\n" \
-		    "$index." "$ssid" "$clients_display" "$encryption" "$channel" "$power" "$bars" "$mac"
+		printf "%-4s %-35s | %-7s | %-12b | %-7s | %-5s | %-5b | %-17s\n" \
+		    "$index." "$ssid" "$clients_display" "$encryption_color" "$channel" "$power" "$bars" "$mac"
 	    fi
 	done | column -t -s "|"
 	echo
@@ -496,7 +516,7 @@ function devices_scanner() {
     echo -ne "\r                                      \r"
 
     if [ -z "$target_devices" ]; then
-        echo -e "\033[1m\nNo device were found.\033[0m"
+        echo -e "\033[1;31m\033[1mNo device were found.\033[0m\n\n"
         sudo pkill airodump-ng
         rm -r "$targets_path/$bssid_name"
         another_scan_prompt
