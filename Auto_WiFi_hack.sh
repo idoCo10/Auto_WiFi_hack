@@ -111,7 +111,7 @@ function check_wordlist() {
         echo
     else
        echo -e "\n\nDownloading OUI file - Vendors detailes.\n"
-       wget -q https://raw.githubusercontent.com/Doksy/OUI-list-2025/main/oui.txt -O  "$targets_path"/oui.txt
+       wget -q https://raw.githubusercontent.com/idoCo10/OUI-list-2025/main/oui.txt -O  "$targets_path"/oui.txt
        wait
     fi         
 }
