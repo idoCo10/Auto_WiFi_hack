@@ -28,10 +28,7 @@
 
 
 
-
-
-
-#######################    Instructions    #######################
+#######################    Instructions    ######################
 # Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path And OUI file for vendors name of devices and routers (will help identify farther attacks).
 
 # **IMPORTANT** for Alfa AWUS036AXML wifi card:
@@ -47,6 +44,8 @@
 #			linux /live/vmlinuz-6.8.11-amd64 boot=live persistence components quiet splash noeject findiso=${iso_path} persistence nomodeset
 #			initrd /live/initrd.img-6.8.11-amd64
 # 		}
+#################################################################    
+
 
 
 
