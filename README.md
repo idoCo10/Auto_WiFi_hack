@@ -17,16 +17,19 @@ Make sure you're connected to the internet before running the script to download
   
 - The script will scan all devices that connected to that network and Deauth them from the router.
 - The script will attempt to captures the EAPOL handshake of WiFi networks.
+- Clearer indication of captured handshake type (EAPOL / PMKID) after conversion.
 
     <img src="assets/Deauth.png" width="40%">
   
-- After capturing the EAPOL the user will choose if to crack it with rockyou wordlist or brute-force with Hashcat.
-- The crcking will utilizes GPU for faster cracking if available.
+- After capturing the EAPOL (or PMKID), the user will choose if to crack it with rockyou wordlist or brute-force with Hashcat.
+- Detects WPS-enabled networks, showing version and lock status, and offers targeted WPS attacks (Pixie-Dust & PIN brute-force via Reaver).
+- Improved result parsing for more reliable password recovery from Hashcat and Reaver.
+- The cracking process utilizes GPU for faster cracking if available and configured.
 
     Rockyou dictionary attack when found the WiFi password (run in gnome-terminal for better-looking).
     <img src="assets/rockyou_cracked.png" width="40%">
   
-- If you choose to brute-force I customized Hashcat for easy options, for example you can choose the length of the password and what characters/numbers/specials will be in each position.
+- If you choose to brute-force with Hashcat, the script offers customized options, allowing you to specify password length and character sets for each position.
 
     When customizing each position of the bruteforce:
 
@@ -34,13 +37,20 @@ Make sure you're connected to the internet before running the script to download
 
     Note: The actual Hashcat Brute-Force run in gnome-terminal (the script open it on new terminal for better-looking).
   
-- If the password found the script will write it to the file "wifi_passwords.txt" in the scan folder.
+- If the password found (via Hashcat or Reaver), the script will write it to the file "wifi_passwords.txt" in the scan folder.
 
+### WPS Attacks
+- During network selection, if a chosen network is WPS-enabled, its WPS version and lock status are displayed.
+- The user is then prompted if they wish to attempt a WPS attack.
+- **Attack Options:**
+    - **Pixie-Dust:** A fast attack targeting some vulnerable routers. Requires `pixiewps`.
+    - **Standard PIN Brute-Force:** A slower method that attempts all possible PINs. Can take a very long time.
+- Reaver's output is saved for review, and successful PSK or PIN recovery is reported.
 
 ## Requirements
-- Kali Linux or Ubuntu (work on Desktop versions because we using **gnome-terminal** for better-looking results).
+- Kali Linux or Ubuntu (works on Desktop versions due to reliance on **gnome-terminal** for displaying attack processes in separate windows).
 - WiFi adapter capable of monitor mode.
-- **hashcat** and **rockyou** wordlist (automatically handled by the script).
+- Core tools like `aircrack-ng`, `hashcat`, `reaver` (for WPS attacks and `wash` scanning), `pixiewps` (for the Pixie-Dust WPS attack), `jq` (for processing scan data), and the `rockyou` wordlist are utilized. The script attempts to automatically install these dependencies if they are missing.
 
 ## Installation & Usage
 1. Clone this repository:
