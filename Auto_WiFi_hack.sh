@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.5.3 20/5/25 02:35
+# version: 3.5.4 23/5/25 00:50
 
 
 ### Changlog ###
@@ -189,7 +189,7 @@ function spoof_adapter_mac() {
 # ------------------------------
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=5
+        countdown_duration=15
         sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -203,9 +203,19 @@ function network_scanner() {
         
 	# Extract client MAC and associated BSSID from the original scan without displaying them
 	clients_content=$(awk -F, '/Station MAC/ {flag=1; next} flag && $1 ~ /:/ {client_mac=$1; bssid=$6; if (bssid !~ /(not associated)/) printf "%-22s %s\n", client_mac, bssid}' "$scan_input.original")
+        
+        # Fix WPA3 shown as WPA3-WPA2
+	awk -F',' 'BEGIN { OFS="," }
+	{
+	    if ($6 ~ /^[[:space:]]*WPA3 WPA2[[:space:]]*$/ && $8 ~ /^[[:space:]]*SAE[[:space:]]*$/) {
+		sub(/WPA3 WPA2/, "WPA3", $6)
+	    }
+	    print
+	}' "$scan_input.original" > "$scan_input.cleaned"
+
 
 	# Edit original scan file to a more organized format
-	awk -F, 'BEGIN {OFS=","} {print $1, $4, $6, $9, $14}' "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input" # Extract relevant fields
+	awk -F, 'BEGIN {OFS=","} {print $1, $4, $6, $9, $14}' "$scan_input.cleaned" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input" # Extract relevant fields
 	awk '/^Station MAC,/ {print; exit} {print}' "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"           # Delete the clients part
 	awk -F',' '$NF ~ /\S/' "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"                                # Delete networks without names
 	tail -n +2 "$scan_input" > "$scan_input.tmp" && mv "$scan_input.tmp" "$scan_input"                                            # Remove the header
@@ -219,7 +229,7 @@ function network_scanner() {
 	echo -e "\n\033[1;33mAvailable WiFi Networks:\033[0m\n"
 
 	# Display the scan input file contents with row numbers
-	printf "\033[1m      Name: %-30s Clients: %-1s Encryption: %-3s Channel: %-1s Power: %-1s Signal: %-0s BSSID: %-13s Vendor: %-1s\033[0m\n"
+	printf "\033[1m      Name: %-30s Clients: %-1s Encryption: %-1s Channel: %-1s Power: %-1s Signal: %-0s BSSID: %-13s Vendor: %-1s\033[0m\n"
 	echo "--------------------------------------------------------------------------------------------------------------------------------------------------"
 
 	declare -A client_counts
@@ -289,10 +299,10 @@ function network_scanner() {
 
 	    # Use printf to format the fields and pipe into column for proper alignment
 	    if [[ -n "$vendor" ]]; then
-		printf "%-4s %-35s | %-7s | %-21b | %-7s | %-5s | %-5b | %-17s | %-1s\n" \
+		printf "%-4s %-35s | %-7s | %-19b | %-7s | %-5s | %-5b | %-17s | %-1s\n" \
 		    "$index." "$ssid" "$clients_display" "$encryption_color" "$channel" "$power" "$bars" "$mac" "$vendor"
 	    else
-		printf "%-4s %-35s | %-7s | %-21b | %-7s | %-5s | %-5b | %-17s\n" \
+		printf "%-4s %-35s | %-7s | %-19b | %-7s | %-5s | %-5b | %-17s\n" \
 		    "$index." "$ssid" "$clients_display" "$encryption_color" "$channel" "$power" "$bars" "$mac"
 	    fi
 	done | column -t -s "|"
@@ -357,7 +367,7 @@ function choose_network() {
             echo -e "\033[1;31m\033[1mEncryption:\033[0m $encryption"
         fi
         echo -e "\033[1;31m\033[1mChannel:\033[0m $channel"
-        echo -e "\033[1;31m\033[1mPower:\033[0m $power"        
+        #echo -e "\033[1;31m\033[1mPower:\033[0m $power"        
         echo
         echo
 
@@ -370,7 +380,7 @@ function choose_network() {
             echo -e "Choose different Network.\n"
             continue           
         elif [[ "$encryption" == "WEP" ]]; then
-            echo -e "\033[1mThe encryption is "$encryption". This is easy to hack.\033[0m"
+            echo -e "\033[1mThe encryption is "$encryption".\033[0m"
 	    crack_wep
             continue                    
         fi
@@ -635,9 +645,9 @@ function crack_wep() {
         wifi_pass=$(grep -oP 'KEY FOUND! \[ \K[0-9A-F:]+(?=\s\])' $targets_path/$bssid_name/WEP_output.txt | tr -d ':')            
     fi
 
-    echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m	Important: The password may be in Upper or Lower case or both. Try them if the password is not correct."
-    echo -e \n--- >> $targets_path/wifi_passwords.txt
-    printf "The wifi password of $bssid_name ($bssid_address) is:   $wifi_pass" >> "$targets_path/wifi_passwords.txt"
+    echo -e "\033[1;34mThe Wi-Fi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m	Important: The password may be in Upper or Lower case or both. Try them if the password is not correct."
+    echo -e --- >> $targets_path/wifi_passwords.txt
+    printf "The Wi-Fi password of $bssid_name ($bssid_address) is:   $wifi_pass" >> "$targets_path/wifi_passwords.txt"
 
     cleanup
     exit 0
