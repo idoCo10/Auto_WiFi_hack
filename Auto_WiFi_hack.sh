@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.5.4 23/5/25 00:50
+# version: 3.5.4 23/5/25 13:10
 
 
 ### Changlog ###
@@ -289,6 +289,8 @@ function network_scanner() {
 	        encryption_color="\e[93mWPA2\e[0m"  # Orange
 	    elif [[ "$temp_encryption" == "WPA2 WPA" || "$temp_encryption" == "WPA WPA2" ]]; then
 	        encryption_color="\e[96mWPA2 WPA\e[0m"  # Cyan
+	    elif [[ "$temp_encryption" == "WPA" ]]; then
+	        encryption_color="\e[1;36mWPA\e[0m" 	        
 	    elif [[ "$temp_encryption" == "OPN" || "$temp_encryption" == "Open" ]]; then
 	        encryption_color="\e[92mOPEN\e[0m"  # Green
 	    else
@@ -299,10 +301,10 @@ function network_scanner() {
 
 	    # Use printf to format the fields and pipe into column for proper alignment
 	    if [[ -n "$vendor" ]]; then
-		printf "%-4s %-35s | %-7s | %-19b | %-7s | %-5s | %-5b | %-17s | %-1s\n" \
+		printf "%-4s %-35s | %-7s | %-10b | %-7s | %-5s | %-5b | %-17s | %-1s\n" \
 		    "$index." "$ssid" "$clients_display" "$encryption_color" "$channel" "$power" "$bars" "$mac" "$vendor"
 	    else
-		printf "%-4s %-35s | %-7s | %-19b | %-7s | %-5s | %-5b | %-17s\n" \
+		printf "%-4s %-35s | %-7s | %-10b | %-7s | %-5s | %-5b | %-17s\n" \
 		    "$index." "$ssid" "$clients_display" "$encryption_color" "$channel" "$power" "$bars" "$mac"
 	    fi
 	done | column -t -s "|"
