@@ -614,7 +614,7 @@ function capture_handshake() {
 # Router with Mixed Encryption
 # ------------------------------
 function mixed_encryption() {
-    echo -e "\033[1mThe Encryption is "$encryption". \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\033[0m\n"
+    echo -e "\033[1mThe Encryption is "$encryption".\033[0m \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\n"
     gnome-terminal --geometry=70x3-10000-10000 -- timeout 95s mdk4 $wifi_adapter"mon" b -n $bssid_name_original -c $channel -w a
     sleep 5
 }
