@@ -79,7 +79,7 @@ sudo chown -R $UN:$UN $targets_path
 # Dependencies Installation
 # ------------------------------
 function install_dependencies() {
-    packages=("aircrack-ng" "gnome-terminal" "wget" "hashcat" "hcxtools" "mdk4" "gawk" "dbus-x11")
+    packages=("aircrack-ng" "gnome-terminal" "wget" "hashcat" "hcxtools" "macchanger" "mdk4" "gawk" "dbus-x11")
     for package in "${packages[@]}"; do
         if ! dpkg -l | grep -q "^ii  $package "; then
             echo -e "\nUpdating the repositories.."
