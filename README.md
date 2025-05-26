@@ -14,6 +14,8 @@ Make sure you're connected to the internet before running the script to download
 - Scan all networks around you and choose network to attack:
   
     <img src="assets/scan.png" width="140%">
+    <img src="assets/scan.png" width="140%">
+
   
 - The script will scan all devices that connected to that network and Deauth them from the router.
 - The script will attempt to captures the EAPOL handshake of WiFi networks.
