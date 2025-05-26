@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.6 27/5/25 02:30
+# version: 3.6 27/5/25 03:00
 
 
 ### Changlog ###
@@ -9,6 +9,8 @@
 
 ### FIX ###
 	# delay between scan to output
+	# Close the scan window
+	# rebuild wpa2-wpa3
 
 
 ### To Do ###
@@ -172,6 +174,7 @@ function adapter_config() {
 	fi
 }
 
+
 # ------------------------------
 # Change adapter mac address
 # ------------------------------
@@ -186,12 +189,13 @@ function spoof_adapter_mac() {
 	random_mac=$(ip link show ${wifi_adapter}mon | awk '/link\/ieee802.11/ {print $2}') 
 }
 
+
 # ------------------------------
 # Network Scanner
 # ------------------------------
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=15
+        countdown_duration=5
         gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -278,7 +282,6 @@ function network_scanner() {
 	    else
 	        bars="\e[1;31m____\e[0m"  # Very Weak 
 	    fi
-
 
 	    # Colorize encryption type using if-elif, replacing with colorized label
 	    temp_encryption=$encryption
@@ -423,7 +426,7 @@ function choose_network() {
 
         validate_network
         
-        break  # Exit the loop once a valid network is chosen
+        break  
     done
 }
 
@@ -594,7 +597,7 @@ function capture_handshake() {
 
 
     if (( counter == max_tries )); then
-        echo "Timeout: No PMKID or EAPOL captured in 120 seconds."
+        echo -e "\n\n\e[31mTimeout: No PMKID or EAPOL captured in 120 seconds.\e[0m"
         another_scan_prompt
         return
     fi
