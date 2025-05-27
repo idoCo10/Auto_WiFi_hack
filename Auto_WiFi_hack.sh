@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.6.2 28/5/25 00:50
+# version: 3.6.2 28/5/25 02:00
 
 
 ### Changlog ###
@@ -80,7 +80,7 @@ chown -R $UN:$UN $targets_path
 
 
 function first_setup() {
-    echo -e "\n\n\033[1;34m[*] Checking and installing required packages..\033[0m"
+    echo -e "\n\n\033[1;34m[*] Checking and installing required packages:\033[0m"
 
     mandatory_packages=("aircrack-ng" "gnome-terminal" "hashcat" "hcxtools" "gawk" "dbus-x11")
     optional_packages=("wget" "macchanger" "mdk4")
@@ -135,7 +135,7 @@ function first_setup() {
     fi
     
 
-    echo -e "\n\n\033[1;34m[*] Verifying wordlists and vendor data..\033[0m"
+    echo -e "\n\n\033[1;34m[*] Verifying wordlists and vendor data:\033[0m"
 
     if [ ! -d "$wordlists_dir" ]; then
         mkdir -p "$wordlists_dir"
@@ -177,7 +177,7 @@ function first_setup() {
 
 
 function enable_gpu() {
-    echo -e "\033[1;34m[*] Getting GPU details..\033[0m"
+    echo -e "\033[1;34m[*] Getting GPU details:\033[0m"
     # Check if running in a VM
     if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
         echo -e "\033[1;33m[!]\033[0m You are running inside a VM. \e[1mGPU is not available.\e[0m\n\n"
@@ -234,6 +234,7 @@ function enable_gpu() {
 
 
 function adapter_config() {
+	echo -e "\033[1;34m[*] Changing Wi-Fi adapter to Monitore mode:\033[0m"
 	airmon-ng check kill > /dev/null 2>&1   # Kill interfering processes
 
 	# Check known adapters first
@@ -241,25 +242,29 @@ function adapter_config() {
 	    wifi_adapter="wlan1"
 	elif iw dev wlan1mon info &>/dev/null; then
 	    wifi_adapter="wlan1"
-	    echo -e "\e[1mWiFi adapter:\e[0m $wifi_adapter \nThe adapter is in monitor mode."
+	    echo -e "\e[1m[+] WiFi adapter:\e[0m $wifi_adapter"
+	    echo -e "\033[1;32m[✔]\033[0m The adapter is in monitor mode.\n\n"
 	    return 0    
 	elif iwconfig wlan0 &> /dev/null; then
 	    wifi_adapter="wlan0"
 	elif iw dev wlan0mon info &>/dev/null; then
 	    wifi_adapter="wlan0"
-	    echo -e "\e[1mWiFi adapter:\e[0m $wifi_adapter \nThe adapter is in monitor mode."
+	    echo -e "\e[1m[+] WiFi adapter:\e[0m $wifi_adapter"
+	    echo -e "\033[1;32m[✔]\033[0m The adapter is in monitor mode.\n\n"
 	    return 0
 	else
 	    # Auto-detect WiFi adapter before asking the user
 	    detected_adapter=$(iw dev | awk '$1=="Interface"{print $2}')
 	    if [[ -n "$detected_adapter" ]]; then
 	        wifi_adapter="$detected_adapter"
-	        #echo -e "\e[1mDetected WiFi adapter:\e[0m $wifi_adapter"
 	    else
-	        read -p "WiFi adapter not detected. Please enter the name of your WiFi adapter: " wifi_adapter
+	        echo -e "\033[1;31m[✘]\033[0m WiFi adapter not detected.\n"
+	        read -p "Please enter your WiFi adapter name: " wifi_adapter
+	        echo
 	    fi
 	fi  	
-	echo -e "\e[1mWiFi adapter:\e[0m $wifi_adapter\nChanging $wifi_adapter to monitor mode"
+	echo -e "\e[1m[+] WiFi adapter:\e[0m $wifi_adapter"
+	echo -e "[~] Changing $wifi_adapter to monitor mode."
 	airmon-ng start "$wifi_adapter" > /dev/null 2>&1
 
 	# Find the new monitor mode adapter name
@@ -268,8 +273,9 @@ function adapter_config() {
 	if [[ -n "$mon_adapter" ]]; then
 		# Extract the original adapter name by removing 'mon' from the end
 		wifi_adapter="${mon_adapter%mon}"
+		echo -e "\033[1;32m[✔]\033[0m Success.\n\n"
 	else
-		echo -e "\e[31mFailed to start monitor mode. Check your adapter and try again.\e[0m"
+		echo -e "\033[1;31m[✘]\033[0m \e[31mFailed to start $wifi_adapter in monitor mode.\e[0m Check your adapter and try again.\n\n"
 		exit 1
 	fi
 }
@@ -277,21 +283,46 @@ function adapter_config() {
 
 
 function spoof_adapter_mac() {
-	# Spoof Adapter mac address to random address
-	echo -e "\n\nRandomizing Wi-Fi adapter MAC address:"
-	
-	ifconfig ${wifi_adapter}mon down
-        macchanger -r ${wifi_adapter}mon > /dev/null 2>&1
-        ifconfig ${wifi_adapter}mon up
-        macchanger -s ${wifi_adapter}mon
-	random_mac=$(ip link show ${wifi_adapter}mon | awk '/link\/ieee802.11/ {print $2}') 
+    echo -e "\033[1;34m[*] Randomizing Wi-Fi adapter MAC address:\033[0m"
+
+    # Bring interface down
+    ifconfig ${wifi_adapter}mon down
+
+    # Get permanent MAC + vendor
+    perm_output=$(macchanger -p ${wifi_adapter}mon 2>/dev/null)
+    perm_mac=$(echo "$perm_output" | awk -F': ' '/Permanent MAC:/ {print $2}' | cut -d' ' -f1 | tr '[:lower:]' '[:upper:]')
+    perm_vendor=$(echo "$perm_output" | sed -n 's/.*Permanent MAC:.*(\(.*\)).*/\1/p')
+
+    # Randomize MAC
+    rand_output=$(macchanger -r ${wifi_adapter}mon 2>/dev/null)
+    rand_mac=$(echo "$rand_output" | awk -F': ' '/New MAC:/ {print $2}' | cut -d' ' -f1 | tr '[:lower:]' '[:upper:]')
+    rand_vendor=$(echo "$rand_output" | sed -n 's/.*New MAC:.*(\(.*\)).*/\1/p')
+
+    # Bring interface up
+    ifconfig ${wifi_adapter}mon up
+
+    # Fallback if parsing failed
+    if [ -z "$rand_mac" ]; then
+        rand_mac=$(ip link show ${wifi_adapter}mon | awk '/link\/ieee802.11/ {print $2}' | tr '[:lower:]' '[:upper:]')
+        rand_vendor="unknown"
+    fi
+
+    # Output
+    echo -e "[~] Permanent MAC:  $perm_mac ($perm_vendor)"
+    echo -e "\033[1;32m[✔]\033[0m Randomized MAC: $rand_mac ($rand_vendor)"
 }
+
+
+
+
+
+
 
 
 
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=4
+        countdown_duration=15
         gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -434,7 +465,7 @@ function choose_network() {
             fi
             echo
             read -p "Enter row number: " row_number
-            echo
+            echo -e "\n\n"
         done
 
         # Extracting values from airodump-ng scan file
