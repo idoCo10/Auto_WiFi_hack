@@ -1014,7 +1014,7 @@ function enable_gpu() {
     GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
 
     if [[ -z "$GPU_INFO" ]]; then
-        echo -e "\n\e[1;31mNo NVIDIA GPU detected. Skipping GPU setup.\e[0m"
+        echo -e "\n\e[1;31mNo NVIDIA GPU detected. Skipping GPU setup.\e[0m\n"
         return 1
     fi
 
