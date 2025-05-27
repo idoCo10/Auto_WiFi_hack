@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.6.1 27/5/25 20:00
+# version: 3.6.2 28/5/25 00:50
 
 
 ### Changlog ###
@@ -80,73 +80,156 @@ chown -R $UN:$UN $targets_path
 
 
 function first_setup() {
-    echo -e "\n\n\033[1;34m[*] Checking and installing required packages...\033[0m"
-    packages=("aircrack-ng" "gnome-terminal" "wget" "hashcat" "hcxtools" "macchanger" "mdk4" "gawk" "dbus-x11")
-    all_installed=true
+    echo -e "\n\n\033[1;34m[*] Checking and installing required packages..\033[0m"
 
-    for package in "${packages[@]}"; do
+    mandatory_packages=("aircrack-ng" "gnome-terminal" "hashcat" "hcxtools" "gawk" "dbus-x11")
+    optional_packages=("wget" "macchanger" "mdk4")
+    failed_mandatory=()
+    failed_optional=()
+
+    check_install() {
+        local package="$1"
         if ! dpkg -l | grep -q "^ii  $package "; then
-            echo -e "\n\033[1;33m[!] $package not found. Installing...\033[0m"
-            apt update -y >/dev/null
-            if apt install -y "$package" >/dev/null; then
-                echo -e "\033[1;32m[✔] $package installed successfully.\033[0m"
+            echo -e "\033[1;33m[!]\033[0m $package not found. Installing..."
+            apt-get update -y >/dev/null  2>&1
+            if apt-get install -y "$package" >/dev/null  2>&1; then
+                echo -e "\033[1;32m[✔]\033[0m $package installed successfully."
+                return 0
             else
                 echo -e "\033[1;31m[✘] Failed to install $package.\033[0m"
-                all_installed=false
+                return 1
             fi
         else
-            echo -e "[✔] $package already installed."
+            echo -e "\033[1;32m[✔]\033[0m $package already installed."
+            return 0
+        fi
+    }
+
+    for package in "${mandatory_packages[@]}"; do
+        if ! check_install "$package"; then
+            failed_mandatory+=("$package")
         fi
     done
 
-    if [ "$all_installed" = true ]; then
-        echo -e "\e[1m[✔] All dependencies are installed.\e[0m"
-    else
-        echo -e "\n\033[1;31m[✘] Some packages failed to install. Please check manually.\033[0m"
+    for package in "${optional_packages[@]}"; do
+        if ! check_install "$package"; then
+            failed_optional+=("$package")
+        fi
+    done
+
+    if [ "${#failed_mandatory[@]}" -ne 0 ]; then
+        echo -e "\n\033[1;31m[✘]\033[0m The following mandatory packages failed to install:"
+        for pkg in "${failed_mandatory[@]}"; do
+            echo "   - $pkg"
+        done
+        echo -e "\nPlease install them manually before running the script again.\n"
+        exit 1
     fi
 
-    echo -e "\n\033[1;34m[*] Verifying wordlists and vendor data...\033[0m"
+    if [ "${#failed_optional[@]}" -ne 0 ]; then
+        echo -e "\n\033[1;33m[!]\033[0m The following optional packages failed to install:"
+        for pkg in "${failed_optional[@]}"; do
+            echo "   - $pkg"
+        done
+        echo -e "The script will continue, but some features may not work as expected.\n"
+    fi
+    
 
-    # Check and create wordlist directory
+    echo -e "\n\n\033[1;34m[*] Verifying wordlists and vendor data..\033[0m"
+
     if [ ! -d "$wordlists_dir" ]; then
         mkdir -p "$wordlists_dir"
-        echo -e "\033[1;33m[+] Wordlist directory created at $wordlists_dir\033[0m"
+        echo -e "\033[1;33m[+]\033[0m Wordlist directory created at $wordlists_dir"
     fi
 
-    # Check rockyou.txt
     if [ -f "$rockyou_file" ]; then
-        echo -e "[✔] Found rockyou.txt wordlist."
+        echo -e "\033[1;32m[✔]\033[0m Found rockyou.txt wordlist."
     else
         if [ -f "$rockyou_gz" ]; then
-            echo -e "\033[1;33m[+] Unzipping rockyou.txt.gz...\033[0m"
             gzip -d "$rockyou_gz"
-            echo -e "\033[1;32m[✔] Unzipped rockyou.txt.\033[0m"
+            echo -e "\033[1;32m[✔]\033[0m Unzipped rockyou.txt."
         else
-            echo -e "\033[1;33m[+] Downloading rockyou.txt...\033[0m"
-            wget -q -P "$wordlists_dir" https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt 
+            echo -e "\033[1;33m[+]\033[0m Downloading rockyou.txt..."
+            wget -q -P "$wordlists_dir" https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt
             if [ -f "$rockyou_file" ]; then
-                echo -e "\033[1;32m[✔] rockyou.txt downloaded.\033[0m"
+                echo -e "\033[1;32m[✔]\033[0m rockyou.txt downloaded."
             else
-                echo -e "\033[1;31m[✘] Failed to download rockyou.txt.\033[0m"
+                echo -e "\033[1;31m[✘]\033[0m Failed to download rockyou.txt."
             fi
         fi
     fi
 
-    # Check oui.txt for vendor lookups
     if [ -f "$oui_file" ]; then
-        echo -e "[✔] Found OUI vendor file."
+        echo -e "\033[1;32m[✔]\033[0m Found OUI vendor file."
     else
-        echo -e "\033[1;33m[+] Downloading OUI vendor file...\033[0m"
+        echo -e "\033[1;33m[+]\033[0m Downloading OUI vendor file..."
         wget -q https://raw.githubusercontent.com/idoCo10/OUI-list-2025/main/oui.txt -O "$targets_path"/oui.txt
         if [ -f "$oui_file" ]; then
-            echo -e "\033[1;32m[✔] OUI vendor file downloaded.\033[0m"
+            echo -e "\033[1;32m[✔]\033[0m OUI vendor file downloaded."
         else
-            echo -e "\033[1;31m[✘] Failed to download OUI vendor file.\033[0m"
+            echo -e "\033[1;31m[✘]\033[0m Failed to download OUI vendor file."
         fi
     fi
     echo -e "\n"
 }
 
+
+
+
+function enable_gpu() {
+    echo -e "\033[1;34m[*] Getting GPU details..\033[0m"
+    # Check if running in a VM
+    if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
+        echo -e "\033[1;33m[!]\033[0m You are running inside a VM. \e[1mGPU is not available.\e[0m\n\n"
+        return 1
+    fi
+    # Detect GPU
+    GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
+
+    if [[ -z "$GPU_INFO" ]]; then
+        echo -e "\n\e[1;31mNo NVIDIA GPU detected. Skipping GPU setup.\e[0m\n"
+        return 1
+    fi
+    # Extract GPU model
+    GPU_MODEL=$(echo "$GPU_INFO" | sed -E 's/.*\[(GeForce [^]]+)\].*/\1/')
+    echo -e "GPU detected: \e[1;32mNVIDIA $GPU_MODEL\e[0m"
+
+    # Check for CUDA
+    if command -v nvidia-smi &>/dev/null; then
+        CUDA_VERSION=$(nvidia-smi | grep -i "CUDA Version" | awk '{print $6}')
+        echo -e "CUDA is installed. Version: \e[1;34m$CUDA_VERSION\e[0m"
+    else
+        echo -e "\nCUDA is not detected."
+        read -p "Would you like to install CUDA? (Y/n): " response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            echo -e "\nInstalling NVIDIA CUDA drivers..."
+	    packages=("linux-headers-amd64" "nvidia-driver" "nvidia-cuda-toolkit")
+	    for package in "${packages[@]}"; do
+		    if ! dpkg -l | grep -q "^ii  $package "; then
+		        echo -e "\nInstalling $package..."
+		        apt install -y "$package"
+		    else
+		        echo -e "✅ $package is already installed."
+		    fi
+	    done                        
+            echo -e "\n\e[1;33mPlease reboot your system for changes to take effect.\e[0m"
+            return 0
+        else
+            echo -e "\nSkipping CUDA installation. GPU will not be used."
+            return 1
+        fi
+    fi
+    # Check if Hashcat detects the GPU
+    HASHCAT_INFO=$(hashcat -I | grep GPU 2>/dev/null)
+    if [[ -n "$HASHCAT_INFO" ]]; then
+        echo -e "Great! Hashcat detects the GPU and will use it.\n\n"
+        return 0
+    else
+        echo -e "\nHashcat does not detect the GPU."
+        echo -e "Possible reasons:\n   - Missing NVIDIA drivers\n   - OpenCL not installed\n   - CUDA not properly configured"
+        echo -e "\nSkipping GPU setup."
+    fi
+}
 
 
 
@@ -208,7 +291,7 @@ function spoof_adapter_mac() {
 
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=15
+        countdown_duration=4
         gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
@@ -987,64 +1070,6 @@ function brute-force_attack() {
                 ;;
         esac        
     fi    
-}
-
-
-
-function enable_gpu() {
-    # Check if running in a VM
-    if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
-        echo -e "You are running inside a virtual machine. GPU is not available.\n"
-        return 1
-    fi
-
-    # Detect GPU
-    GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
-
-    if [[ -z "$GPU_INFO" ]]; then
-        echo -e "\n\e[1;31mNo NVIDIA GPU detected. Skipping GPU setup.\e[0m\n"
-        return 1
-    fi
-
-    # Extract GPU model
-    GPU_MODEL=$(echo "$GPU_INFO" | sed -E 's/.*\[(GeForce [^]]+)\].*/\1/')
-    echo -e "GPU detected: \e[1;32mNVIDIA $GPU_MODEL\e[0m"
-
-    # Check for CUDA
-    if command -v nvidia-smi &>/dev/null; then
-        CUDA_VERSION=$(nvidia-smi | grep -i "CUDA Version" | awk '{print $6}')
-        echo -e "CUDA is installed. Version: \e[1;34m$CUDA_VERSION\e[0m"
-    else
-        echo -e "\nCUDA is not detected."
-        read -p "Would you like to install CUDA? (Y/n): " response
-        if [[ "$response" =~ ^[Yy]$ ]]; then
-            echo -e "\nInstalling NVIDIA CUDA drivers..."
-	    packages=("linux-headers-amd64" "nvidia-driver" "nvidia-cuda-toolkit")
-	    for package in "${packages[@]}"; do
-		    if ! dpkg -l | grep -q "^ii  $package "; then
-		        echo -e "\nInstalling $package..."
-		        apt install -y "$package"
-		    else
-		        echo -e "✅ $package is already installed."
-		    fi
-	    done                        
-            echo -e "\n\e[1;33mPlease reboot your system for changes to take effect.\e[0m"
-            return 0
-        else
-            echo -e "\nSkipping CUDA installation. GPU will not be used."
-            return 1
-        fi
-    fi
-    # Check if Hashcat detects the GPU
-    HASHCAT_INFO=$(hashcat -I | grep GPU 2>/dev/null)
-    if [[ -n "$HASHCAT_INFO" ]]; then
-        echo -e "Great! Hashcat detects the GPU and will use it.\n\n"
-        return 0
-    else
-        echo -e "\nHashcat does not detect the GPU."
-        echo -e "Possible reasons:\n   - Missing NVIDIA drivers\n   - OpenCL not installed\n   - CUDA not properly configured"
-        echo -e "\nSkipping GPU setup."
-    fi
 }
 
 
