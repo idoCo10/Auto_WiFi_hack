@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.6.2 28/5/25 02:00
+# version: 3.6.2 28/5/25 02:20
 
 
 ### Changlog ###
@@ -11,6 +11,7 @@
 	# delay between scan to output
 	# Close the scan window
 	# rebuild wpa2-wpa3
+	# Add timer to the pmkid attack
 
 
 ### To Do ###
@@ -187,47 +188,47 @@ function enable_gpu() {
     GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
 
     if [[ -z "$GPU_INFO" ]]; then
-        echo -e "\n\e[1;31mNo NVIDIA GPU detected. Skipping GPU setup.\e[0m\n"
+        echo -e "\n\033[1;31m[✘]\033[0m \e[1;31mNo NVIDIA GPU detected. Skipping GPU setup.\e[0m\n"
         return 1
     fi
     # Extract GPU model
     GPU_MODEL=$(echo "$GPU_INFO" | sed -E 's/.*\[(GeForce [^]]+)\].*/\1/')
-    echo -e "GPU detected: \e[1;32mNVIDIA $GPU_MODEL\e[0m"
+    echo -e "\033[1;32m[✔]\033[0m GPU detected: \033[1;33mNVIDIA $GPU_MODEL\033[0m"
 
     # Check for CUDA
     if command -v nvidia-smi &>/dev/null; then
         CUDA_VERSION=$(nvidia-smi | grep -i "CUDA Version" | awk '{print $6}')
-        echo -e "CUDA is installed. Version: \e[1;34m$CUDA_VERSION\e[0m"
+        echo -e "\033[1;32m[✔]\033[0m CUDA is installed. Version: \e[1;34m$CUDA_VERSION\e[0m"
     else
-        echo -e "\nCUDA is not detected."
+        echo -e "\n\033[1;33m[!]\033[0m CUDA is not detected."
         read -p "Would you like to install CUDA? (Y/n): " response
         if [[ "$response" =~ ^[Yy]$ ]]; then
-            echo -e "\nInstalling NVIDIA CUDA drivers..."
+            echo -e "\n[~] Installing NVIDIA CUDA drivers..."
 	    packages=("linux-headers-amd64" "nvidia-driver" "nvidia-cuda-toolkit")
 	    for package in "${packages[@]}"; do
 		    if ! dpkg -l | grep -q "^ii  $package "; then
-		        echo -e "\nInstalling $package..."
+		        echo -e "\n[~] Installing $package..."
 		        apt install -y "$package"
 		    else
-		        echo -e "✅ $package is already installed."
+		        echo -e "\033[1;32m[✔]\033[0m $package is already installed."
 		    fi
 	    done                        
-            echo -e "\n\e[1;33mPlease reboot your system for changes to take effect.\e[0m"
+            echo -e "\n\033[1;33m[!]\033[0m \e[1;33mPlease reboot your system for changes to take effect.\e[0m"
             return 0
         else
-            echo -e "\nSkipping CUDA installation. GPU will not be used."
+            echo -e "\n\033[1;33m[!]\033[0m Skipping CUDA installation. GPU will not be used."
             return 1
         fi
     fi
     # Check if Hashcat detects the GPU
     HASHCAT_INFO=$(hashcat -I | grep GPU 2>/dev/null)
     if [[ -n "$HASHCAT_INFO" ]]; then
-        echo -e "Great! Hashcat detects the GPU and will use it.\n\n"
+        echo -e "\033[1;32m[✔]\033[0m Great! Hashcat detects the GPU and will use it to crack the passwords.\n\n"
         return 0
     else
-        echo -e "\nHashcat does not detect the GPU."
-        echo -e "Possible reasons:\n   - Missing NVIDIA drivers\n   - OpenCL not installed\n   - CUDA not properly configured"
-        echo -e "\nSkipping GPU setup."
+        echo -e "\n\033[1;31m[✘]\033[0m Hashcat does not detect the GPU."
+        echo -e "\033[1;33m[!]\033[0m Possible reasons:\n   - Missing NVIDIA drivers\n   - OpenCL not installed\n   - CUDA not properly configured"
+        echo -e "\n\033[1;33m[!]\033[0m Skipping GPU setup."
     fi
 }
 
