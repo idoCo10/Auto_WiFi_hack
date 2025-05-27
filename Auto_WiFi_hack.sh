@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# version: 3.6.2 28/5/25 02:20
+version=3.6.2 # 28/5/25 04:00
 
 
 ### Changlog ###
@@ -49,6 +49,87 @@
 
 
 
+
+
+
+
+# Colors
+RESET=$'\033[0m'
+GREEN=$'\033[0;32m'
+RED=$'\033[0;31m'
+YELLOW=$'\033[1;33m'
+WHITE=$'\033[1;37m'
+CYAN=$'\033[0;36m'
+
+clear 
+
+# Hide cursor
+tput civis
+trap "tput cnorm; exit" INT TERM
+
+# ASCII banner lines
+banner_lines=(
+"    █████╗ ██╗   ██╗████████╗ ██████╗     ██╗    ██╗██╗███████╗██╗    ██╗  ██╗ █████╗  ██████╗██╗  ██╗"
+"   ██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗    ██║    ██║   ██╔════╝       ██║  ██║██╔══██╗██╔════╝██║ ██╔╝"
+"   ███████║██║   ██║   ██║   ██║   ██║    ██║ █╗ ██║██║█████╗  ██║    ███████║███████║██║     █████╔╝ "
+"   ██╔══██║██║   ██║   ██║   ██║   ██║    ██║███╗██║██║██╔══╝  ██║    ██╔══██║██╔══██║██║     ██╔═██╗ "
+"   ██║  ██║╚██████╔╝   ██║   ╚██████╔╝    ╚███╔███╔╝██║██║     ██║    ██║  ██║██║  ██║╚██████╗██║  ██╗"
+"   ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝      ╚══╝╚══╝ ╚═╝╚═╝     ╚═╝    ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝"
+)
+
+# Starting row and column
+start_row=4
+start_col=5
+
+# Matrix drop animation
+for ((col=0; col<${#banner_lines[0]}; col++)); do
+    for ((drop=0; drop<${#banner_lines[@]}; drop++)); do
+        for ((line=0; line<=drop; line++)); do
+            char="${banner_lines[line]:col:1}"
+            [[ "$char" == " " ]] && continue
+            row=$((start_row + line))
+            echo -ne "\033[${row};$((start_col + col))H${CYAN}${char}${RESET}"
+        done
+        sleep 0.0003
+    done
+done
+
+# Fix any straggling characters
+for ((i=0; i<${#banner_lines[@]}; i++)); do
+    echo -ne "\033[$((start_row + i));${start_col}H${RED}${banner_lines[i]}${RESET}"
+done
+echo -e "\n${YELLOW}      🔓 v$version ${RESET}"
+# Show cursor
+tput cnorm
+echo -e "\n\n"
+
+
+frames=(
+"   ${CYAN}◉${RESET}       ${GREEN}◉${RESET}       ${CYAN}◉${RESET}   "
+" ${GREEN}◉${RESET}       ${CYAN}◉${RESET}       ${GREEN}◉${RESET} "
+"${CYAN}◉${RESET}       ${GREEN}◉${RESET}       ${CYAN}◉${RESET}"
+" ${GREEN}◉${RESET}       ${CYAN}◉${RESET}       ${GREEN}◉${RESET} "
+"   ${CYAN}◉${RESET}       ${GREEN}◉${RESET}       ${CYAN}◉${RESET}   "
+)
+
+# Animate
+for i in {1..3}; do
+    for frame in "${frames[@]}"; do
+        echo -ne "\r$frame"
+        sleep 0.1
+    done
+done
+
+echo -e "\n\n\n${WHITE}[+] Script Initialized${RESET}"
+# Move to next line when done
+echo
+
+#sleep 500
+
+
+
+
+
 UN=${SUDO_USER:-$(whoami)}
 current_date=$(date +"%d_%m_%y")
 targets_path="/home/$UN/Desktop/wifi_Targets"
@@ -81,7 +162,7 @@ chown -R $UN:$UN $targets_path
 
 
 function first_setup() {
-    echo -e "\n\n\033[1;34m[*] Checking and installing required packages:\033[0m"
+    echo -e "\n\033[1;34m[*] Checking and installing required packages:\033[0m"
 
     mandatory_packages=("aircrack-ng" "gnome-terminal" "hashcat" "hcxtools" "gawk" "dbus-x11")
     optional_packages=("wget" "macchanger" "mdk4")
@@ -1183,7 +1264,7 @@ function choose_attack() {
 # ------------------------------
 function main_process() {
 	adapter_config
-	spoof_adapter_mac
+	spoof_adapter_mac	
 	network_scanner
 
 	if [[ "$encryption" == "WPA3 WPA2" ]]; then            
