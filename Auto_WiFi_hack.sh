@@ -208,7 +208,7 @@ function spoof_adapter_mac() {
 
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=4
+        countdown_duration=15
         gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
