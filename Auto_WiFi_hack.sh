@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.6.4 # 28/5/25 6:30
+version=3.6.4 # 28/5/25 19:50
 
 
 ### Changlog ###
@@ -315,9 +315,23 @@ function adapter_config() {
         echo -e "${NEON_GREEN}    [✔]${RESET} WiFi adapter detected: ${GREEN}$wifi_adapter${RESET}"
     
     else
-        # Display the adapter list with numbers starting from 1
+        # Display the adapter list with vendor names
         for i in "${!adapters[@]}"; do
-            printf "    %d) %s\n" "$((i + 1))" "${adapters[$i]}"
+            adapter="${adapters[$i]}"
+
+            if [[ "$adapter" == *"mon" ]]; then
+                # Get permanent MAC for monitor-mode adapter
+                perm_mac=$(macchanger -s "$adapter" 2>/dev/null | awk -F': ' '/Permanent MAC:/ {print $2}' | cut -d' ' -f1 | tr '[:lower:]' '[:upper:]')
+                mac_addr="$perm_mac"
+            else
+                # Use current MAC for normal mode adapter
+                mac_addr=$(cat /sys/class/net/$adapter/address 2>/dev/null | tr '[:lower:]' '[:upper:]')
+            fi
+
+            vendor=$(get_oui_vendor "$mac_addr")
+            [[ -z "$vendor" ]] && vendor="unkon"
+
+            printf "    %d) %-12s (%s)\n" "$((i + 1))" "$adapter" "$vendor"
         done
         echo
 
@@ -340,26 +354,27 @@ function adapter_config() {
 
     # If already in monitor mode, skip enabling it again
     if [[ "$wifi_adapter" == *"mon" ]]; then
-        #echo -e "\n${BOLD}    [+] WiFi adapter:${RESET} $wifi_adapter"
         echo -e "${NEON_GREEN}    [✔]${RESET} Adapter is already in monitor mode.\n\n"
         return 0
     fi
 
-    #echo -e "\n    [~] Changing $wifi_adapter to monitor mode.\n"
     airmon-ng start "$wifi_adapter" > /dev/null 2>&1
 
     # Look for the new monitor mode adapter
     mon_adapter=$(iw dev | awk '/Interface/ && /mon$/ {print $2}' | grep "^${wifi_adapter}mon$")
 
     if [[ -n "$mon_adapter" ]]; then
-        wifi_adapter=$mon_adapter
-        #echo -e "${BOLD}    [+] WiFi adapter:${RESET} $wifi_adapter"
-        echo -e "${NEON_GREEN}    [✔]${RESET} Successfully switched to monitor mode.\n\n"
+        echo -e "${NEON_GREEN}    [✔]${RESET} Successfully switched $wifi_adapter to monitor mode.\n\n"
+        wifi_adapter=$mon_adapter        
     else
         echo -e "${RED}    [✘] Failed to start $wifi_adapter in monitor mode.${RESET} Check your adapter and try again.\n\n"
         exit 1
     fi
 }
+
+
+
+
 
 
 
@@ -378,12 +393,14 @@ function spoof_adapter_mac() {
     # Get permanent MAC + vendor
     perm_output=$(macchanger -p ${wifi_adapter} 2>/dev/null)
     perm_mac=$(echo "$perm_output" | awk -F': ' '/Permanent MAC:/ {print $2}' | cut -d' ' -f1 | tr '[:lower:]' '[:upper:]')
-    perm_vendor=$(echo "$perm_output" | sed -n 's/.*Permanent MAC:.*(\(.*\)).*/\1/p')
+    perm_vendor=$(get_oui_vendor "$perm_mac")
+    [[ -z "$perm_vendor" ]] && perm_vendor="unknown"
 
     # Randomize MAC
     rand_output=$(macchanger -r ${wifi_adapter} 2>/dev/null)
     rand_mac=$(echo "$rand_output" | awk -F': ' '/New MAC:/ {print $2}' | cut -d' ' -f1 | tr '[:lower:]' '[:upper:]')
-    rand_vendor=$(echo "$rand_output" | sed -n 's/.*New MAC:.*(\(.*\)).*/\1/p')
+    rand_vendor=$(get_oui_vendor "$rand_mac")
+    [[ -z "$rand_vendor" ]] && rand_vendor="unknown"
 
     # Bring interface up
     ifconfig ${wifi_adapter} up
@@ -391,13 +408,16 @@ function spoof_adapter_mac() {
     # Fallback if parsing failed
     if [ -z "$rand_mac" ]; then
         rand_mac=$(ip link show ${wifi_adapter} | awk '/link\/ieee802.11/ {print $2}' | tr '[:lower:]' '[:upper:]')
-        rand_vendor="unknown"
+        rand_vendor=$(get_oui_vendor "$rand_mac")
+        [[ -z "$rand_vendor" ]] && rand_vendor="unknown"
     fi
 
     # Output
-    echo -e "    [~] Permanent MAC:  $perm_mac ($perm_vendor)"
-    echo -e "${NEON_GREEN}    [✔]${RESET} Randomized MAC: $rand_mac ($rand_vendor)"
+    echo -e "    [~] Permanent MAC:  $perm_mac        ($perm_vendor)"
+    echo -e "${NEON_GREEN}    [✔]${RESET} Randomized MAC: $rand_mac        ($rand_vendor)"
 }
+
+
 
 
 
@@ -712,7 +732,7 @@ function devices_scanner() {
 
                     # Print the "Devices Found" header once
                     if [ "$devices_header_shown" = false ]; then
-                        echo -e "\n${BLUE}Devices Found:${RESET}"
+                        echo -e "\n\n${BLUE}Devices Found:${RESET}"
                         devices_header_shown=true
                     fi
 
