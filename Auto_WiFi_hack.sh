@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.6.6 # 29/5/25 01:20
+version=3.6.6 # 29/5/25 03:00
 
 
 ### Changlog ###
@@ -353,7 +353,7 @@ function adapter_config() {
 
     # If already in monitor mode, skip enabling it again
     if [[ "$wifi_adapter" == *"mon" ]]; then
-        echo -e "${NEON_GREEN}    [✔]${RESET} Adapter is already in monitor mode.\n\n"
+        echo -e "\n${NEON_GREEN}    [✔]${RESET} Adapter is already in monitor mode.\n\n"
         return 0
     fi
 
@@ -363,7 +363,7 @@ function adapter_config() {
     mon_adapter=$(iw dev | awk '/Interface/ && /mon$/ {print $2}' | grep "^${wifi_adapter}mon$")
 
     if [[ -n "$mon_adapter" ]]; then
-        echo -e "${NEON_GREEN}    [✔]${RESET} Successfully switched $wifi_adapter to monitor mode.\n\n"
+        echo -e "\n${NEON_GREEN}    [✔]${RESET} Successfully switched $wifi_adapter to monitor mode.\n\n"
         wifi_adapter=$mon_adapter        
     else
         echo -e "${RED}    [✘] Failed to start $wifi_adapter in monitor mode.${RESET} Check your adapter and try again.\n\n"
@@ -410,7 +410,7 @@ function spoof_adapter_mac() {
 
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=3
+        countdown_duration=15
         gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n\n${BLUE}[*] Scanning available WiFi Networks ($countdown_duration s):${RESET}"
@@ -621,7 +621,7 @@ function choose_network() {
         # If we only captured the handshake from previous scan
         if [ -d "$targets_path/$bssid_name" ]; then
             if grep -q "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt"; then
-                echo -e "${NEON_GREEN}    [✔]${RESET} ${GREEN}Handshake found from previous scan.${RESET}\n"
+                echo -e "${NEON_GREEN}[✔]${RESET} Handshake found from previous scan.\n"
                 pkill aireplay-ng
                 pkill airodump-ng
                 cleanup
@@ -647,7 +647,7 @@ function validate_network() {
     echo -e "${BLUE}[*] Validating Network:${RESET}"
     
     # Open airodump-ng in a hidden terminal
-    gnome-terminal --geometry=105x15-10000-10000 -- script -c "airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter" "$targets_path/$bssid_name/airodump_output.txt"
+    gnome-terminal --geometry=95x12-10000-10000 -- script -c "airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter" "$targets_path/$bssid_name/airodump_output.txt"
 
     found=0
     echo -en "    ${BOLD}[⏳]${RESET} Checking.."
@@ -757,7 +757,7 @@ function attacks() {
         band=""
     fi
 
-    echo -e "\n${RED}->> Starting Attacks:${RESET}"      
+    echo -e "${RED}->> Starting Attacks:${RESET}"      
 
     
     #echo -e "\n     ${RED}[->] Capturing 4-way handshake${RESET}"
@@ -781,10 +781,6 @@ function attacks() {
 	animate_attack "Beacon Flooding attack" 20
 	animate_attack "Probe Request/Response attack" 13
 
-
-
-
-
     # Start device scanner in background
     devices_scanner &
     scanner_pid=$!
@@ -792,10 +788,10 @@ function attacks() {
     # Start hcxdumptool in hidden terminal
     if [[ -n "$band" ]]; then
         channel_with_band="${channel}${band}"
-        gnome-terminal --geometry=95x30-10000-10000 -- bash -c "hcxdumptool -i '${wifi_adapter}' -c '$channel_with_band' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
+        gnome-terminal --geometry=95x30+0-280 -- bash -c "hcxdumptool -i '${wifi_adapter}' -c '$channel_with_band' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
     else
         echo "Warning: Unknown channel ($channel), running without -c"
-        gnome-terminal --geometry=95x30-10000-10000 -- bash -c "hcxdumptool -i '${wifi_adapter}' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
+        gnome-terminal --geometry=95x30+0-280 -- bash -c "hcxdumptool -i '${wifi_adapter}' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
     fi
 
     sleep 2
@@ -1001,7 +997,7 @@ while true; do
     esac
 done
 
-echo -e "\n\n    ${BOLD}[⏳] Cracking WiFi password using:${RESET} $dict_file\n"
+echo -e "\n\n    ${RED}->> Cracking WiFi Password using:${RESET} $dict_file\n"
 
     gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c \
     "hashcat -m 22000 -a 0 \"$targets_path/$bssid_name/hash.hc22000\" \"$dict_file\" \
@@ -1025,13 +1021,13 @@ echo -e "\n\n    ${BOLD}[⏳] Cracking WiFi password using:${RESET} $dict_file\n
         rm -r "$targets_path/$bssid_name"
         exit 1
     else
-        echo -e "\n${RED}Couldn't crack the password with the selected wordlist.${RESET}\n"
+        echo -e "\n${RED}    [✘]${RESET} Couldn't crack the password with the selected wordlist.\n"
         
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with selected wordlist" "$targets_path/wifi_passwords.txt"
         
         echo
-        read -p "Do you want to try different attack? (Y/n): " choice
+        read -p "    [?] Do you want to try different attack? (Y/n): " choice
         case $choice in
             y|Y)
                 choose_attack
@@ -1050,11 +1046,11 @@ echo -e "\n\n    ${BOLD}[⏳] Cracking WiFi password using:${RESET} $dict_file\n
 
 function brute-force_attack() {
     
-    echo -e "    ${BOLD}\nCracking WiFi password with Hashcat ->>${RESET}\n"
+    echo -e "\n   ${RED}->> Brute Forcing WiFi Password with Hashcat${RESET}\n"
 
     # Ask user for password length
     while true; do
-        read -p "Enter password length (WiFi min: 8): " password_length
+        read -p "   Enter password length (WiFi min: 8): " password_length
         if [[ -z "$password_length" ]]; then
             password_length=8
             echo "default is 8"
@@ -1069,23 +1065,23 @@ function brute-force_attack() {
 
     while true; do
         full_mask=""
-        echo -e "\n${BOLD}Choose how to run the Brute-Force:${RESET}"
-        echo -e "${RED}1)${RESET} Try every possible combination                     ?a   -   (ABC-abc-123-!@#)   |   $password_length^94 possibilities.\n"
-        echo -e "${RED}2)${RESET} Customize each position of the password:"
-        echo "   1.  Uppercase                                      ?u   -   (ABC)"
-        echo "   2.  Lowercase                                      ?l   -   (abc)"
-        echo "   3.  Numbers                                        ?d   -   (123)"
-        echo "   4.  Special characters                             ?s   -   (!@#)"
-        echo "   5.  Uppercase + Numbers                            ?1   -   (ABC-123)"
-        echo "   6.  Lowercase + Numbers                            ?2   -   (abc-123)"
-        echo "   7.  Uppercase + Lowercase                          ?3   -   (ABC-abc)"
-        echo "   8.  Uppercase + Lowercase + Numbers                ?4   -   (ABC-abc-123)"        
-        echo "   9.  Uppercase + Lowercase + Numbers + specials     ?a   -   (ABC-abc-123-!@#)"
-        echo "   10. Enter a specific character: __"
+        echo -e "\n   ${BOLD}Choose how to run the Brute-Force:${RESET}"
+        echo -e "   ${RED}1)${RESET} Try every possible combination                     ?a   -   (ABC-abc-123-!@#)   |   $password_length^94 possibilities.\n"
+        echo -e "   ${RED}2)${RESET} Customize each position of the password:"
+        echo "      1.  Uppercase                                      ?u   -   (ABC)"
+        echo "      2.  Lowercase                                      ?l   -   (abc)"
+        echo "      3.  Numbers                                        ?d   -   (123)"
+        echo "      4.  Special characters                             ?s   -   (!@#)"
+        echo "      5.  Uppercase + Numbers                            ?1   -   (ABC-123)"
+        echo "      6.  Lowercase + Numbers                            ?2   -   (abc-123)"
+        echo "      7.  Uppercase + Lowercase                          ?3   -   (ABC-abc)"
+        echo "      8.  Uppercase + Lowercase + Numbers                ?4   -   (ABC-abc-123)"        
+        echo "      9.  Uppercase + Lowercase + Numbers + specials     ?a   -   (ABC-abc-123-!@#)"
+        echo "      10. Enter a specific character: __"
         echo -e "\n\n"
 
 	while true; do
-	    echo -n -e "Enter your choice (${RED}1${RESET}-${RED}2${RESET}): "
+	    echo -n -e "      Enter your choice (${RED}1${RESET}-${RED}2${RESET}): "
 	    read option
 	    if [[ "$option" -eq 1 || "$option" -eq 2 ]]; then
 		break
@@ -1097,7 +1093,7 @@ function brute-force_attack() {
 	done
         
         if [[ "$option" -eq 1 ]]; then
-            echo -e "\nWe will check all possible characters (ABC-abc-123-!@#) for each position."
+            echo -e "\n      We will check all possible characters (ABC-abc-123-!@#) for each position."
             char_set="?a"
             for (( i=0; i<password_length; i++ )); do
                 full_mask+="$char_set"
@@ -1174,7 +1170,7 @@ function brute-force_attack() {
         fi
     done
 
-    echo -e "\n\n${ORANGE}Generated Hashcat mask:${RESET} ${RED}$full_mask${RESET}\n\n"
+    echo -e "\n\n${ORANGE}Generated Hashcat mask:${RESET} ${RED}$full_mask${RESET}\n"
 
     # Run hashcat with the correct options
     if [[ -n "$charset" ]]; then
@@ -1195,10 +1191,10 @@ function brute-force_attack() {
         rm -r $targets_path/"$bssid_name" 
         exit 1
     else
-        echo -e "\n${RED}Couldn't cracked with Brute-Force with this masking: $full_mask${RESET}\n"
+        echo -e "${RED}    [✘]${RESET} Couldn't cracked with Brute-Force with this masking: ${RED}$full_mask${RESET}\n"
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with Brute-Force of this masking: $full_mask" "$targets_path/wifi_passwords.txt"
         echo
-        read -p "Do you want to try different attack (Y/n)? " choice
+        read -p "    [?] Do you want to try different attack (Y/n)? " choice
         case $choice in
             y|Y)
                 choose_attack
@@ -1265,10 +1261,9 @@ function cleanup() {
 
 function choose_attack() {
 	while true; do
-	    echo -e "\n\n${NEON_YELLOW}${BOLD}->> Cracking the Password:${RESET}"
-	    echo -e "    ${BOLD}[?] Choose Cracking method${RESET}"
-	    echo "        1) Dictionary attack"
-	    echo "        2) Brute-Force attack"
+	    echo -e "\n${NEON_YELLOW}${BOLD}->> Choose how to Crack the Password:${RESET}"
+	    echo -e "    1) Dictionary attack"
+	    echo -e "    2) Brute-Force attack\n"
 	    read -p "    Enter your choice (1 or 2): " choice
 	    echo
 
