@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.6.3 # 28/5/25 18:00
+version=3.6.4 # 28/5/25 6:30
 
 
 ### Changlog ###
@@ -410,7 +410,7 @@ function spoof_adapter_mac() {
 
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=15
+        countdown_duration=4
         gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
         echo -e "\n\n${BLUE}Scanning available WiFi Networks ($countdown_duration s):${RESET}"
@@ -573,7 +573,7 @@ function choose_network() {
         oui_vendor=$(get_oui_vendor)
 
         # Echo values
-        echo -e "${RED}BSSID Name:${RESET} $bssid_name_original"
+        echo -e "\n${RED}BSSID Name:${RESET} $bssid_name_original"
         if [[ -n "$oui_vendor" ]]; then
             echo -e "${RED}MAC Address:${RESET} $bssid_address - $oui_vendor"
         else
@@ -702,6 +702,13 @@ function devices_scanner() {
         if [ -n "$target_devices" ]; then
             while IFS= read -r mac; do
                 if [[ -n "$mac" && ! " ${seen_macs[*]} " =~ " $mac " ]]; then
+                    vendor=$(get_oui_vendor "$mac")
+
+                    # Skip "Private" devices before adding to seen_macs
+                    if [[ "$vendor" == "Private" ]]; then
+                        continue
+                    fi
+
                     seen_macs+=("$mac")
 
                     # Print the "Devices Found" header once
@@ -711,7 +718,6 @@ function devices_scanner() {
                     fi
 
                     # Print new device
-                    vendor=$(get_oui_vendor "$mac")
                     if [[ -n "$vendor" ]]; then
                         echo -e "$mac - $vendor"
                     else
@@ -723,6 +729,8 @@ function devices_scanner() {
         sleep 1
     done
 }
+
+
 
 
 
