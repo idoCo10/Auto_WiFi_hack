@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.6.5 # 29/5/25 00:10
+version=3.6.6 # 29/5/25 01:20
 
 
 ### Changlog ###
@@ -129,7 +129,7 @@ for line in "${banner_lines[@]}"; do
     echo -e "${NEON_GREEN}${line}${RESET}"
 done
 
-echo -e "${ORANGE}   ⚡ v$version ${RESET}"
+echo -e "${ORANGE}   v$version ${RESET}"
 
 # Show cursor
 tput cnorm
@@ -141,7 +141,7 @@ echo -e "\n\n"
 
 
 function first_setup() {
-    echo -e "\n\n${BLUE}[*] Checking and installing required packages:${RESET}\n"
+    echo -e "\n\n${BLUE}[*] Checking and installing required packages:${RESET}"
 
     mandatory_packages=("aircrack-ng" "gnome-terminal" "hashcat" "hcxtools" "gawk" "dbus-x11")
     optional_packages=("wget" "macchanger" "mdk4")
@@ -196,7 +196,7 @@ function first_setup() {
     fi
     
 
-    echo -e "\n\n\n\n${BLUE}[*] Verifying wordlists and vendor data:${RESET}\n"
+    echo -e "\n\n\n${BLUE}[*] Verifying Wordlists and vendor data:${RESET}"
 
     if [ ! -d "$wordlists_dir" ]; then
         mkdir -p "$wordlists_dir"
@@ -237,7 +237,7 @@ function first_setup() {
 
 
 function enable_gpu() {
-    echo -e "\n\n${BLUE}[*] Getting GPU details:${RESET}\n"
+    echo -e "\n${BLUE}[*] Getting GPU details:${RESET}"
     # Check if running in a VM
     if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
         echo -e "${NEON_YELLOW}${BOLD}    [⚠]${RESET} You are running inside a VM. ${RED}GPU is not available.${RESET}\n\n"
@@ -294,7 +294,7 @@ function enable_gpu() {
 
 
 function adapter_config() {
-    echo -e "\n\n${BLUE}[*] Detecting WiFi adapters:${RESET}\n"
+    echo -e "\n${BLUE}[*] Detecting WiFi adapters:${RESET}"
     airmon-ng check kill > /dev/null 2>&1   # Kill interfering processes
 
     # Get all WiFi interfaces
@@ -374,7 +374,7 @@ function adapter_config() {
 
 
 function spoof_adapter_mac() {
-    echo -e "\n\n${BLUE}[*] Randomizing WiFi adapter MAC address:${RESET}\n"
+    echo -e "\n${BLUE}[*] Randomizing WiFi adapter MAC address:${RESET}"
 
     # Bring interface down
     ifconfig ${wifi_adapter} down
@@ -413,7 +413,7 @@ function network_scanner() {
         countdown_duration=3
         gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
 
-        echo -e "\n\n\n\n${BLUE}[*] Scanning available WiFi Networks ($countdown_duration s):${RESET}"
+        echo -e "\n\n\n${BLUE}[*] Scanning available WiFi Networks ($countdown_duration s):${RESET}"
         for (( i=$countdown_duration; i>=1; i-- )); do
             tput cuu1 && tput el
             echo -e "${BLUE}[*] Scanning for available WiFi Networks:${RED} $i ${RESET}"
@@ -644,7 +644,7 @@ function choose_network() {
 
 
 function validate_network() {
-    echo -e "${BLUE}[*] Validating network:${RESET}"
+    echo -e "${BLUE}[*] Validating Network:${RESET}"
     
     # Open airodump-ng in a hidden terminal
     gnome-terminal --geometry=105x15-10000-10000 -- script -c "airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter" "$targets_path/$bssid_name/airodump_output.txt"
@@ -723,7 +723,7 @@ function devices_scanner() {
                 fi
             done <<< "$(echo "$target_devices" | tr ' ' '\n')"
         fi
-        sleep 0.5
+        sleep 0.1
     done
 }
 
@@ -809,7 +809,7 @@ function attacks() {
         deauth_attack
         if [[ -s "$hash_file" ]]; then       
             sta_mac=$(grep -m1 '^WPA\*0[12]\*' "$hash_file" | cut -d'*' -f5 | sed 's/../&:/g; s/:$//' | tr 'a-f' 'A-F')
-            sleep 3
+            sleep 5
 
             if grep -q '^WPA\*01\*' "$hash_file"; then
 		echo -e "\n\n${NEON_GREEN}${BOLD}->> Got the PMKID!  ${RESET}(from: $sta_mac)\n"
@@ -975,10 +975,10 @@ function crack_wep() {
 
 function dictionary_attack() {
 while true; do
-    echo -e "\n${BOLD}Choose a wordlist:${RESET}"
-    echo "1. Use rockyou.txt"
-    echo "2. Use a different dictionary"
-    read -p "Enter your choice (1 or 2): " wordlist_choice
+    echo -e "\n    ${BOLD}[?] Choose a Wordlist:${RESET}"
+    echo "        1) Use Rockyou"
+    echo "        2) Use a different wordlist"
+    read -p "    Enter your choice (1 or 2): " wordlist_choice
 
     case "$wordlist_choice" in
         1)
@@ -986,12 +986,13 @@ while true; do
             break
             ;;
         2)
-            read -e -p "Enter the full path to your custom dictionary file: " custom_dict
+            echo
+            read -e -p "    Enter the full path to your custom dictionary file: " custom_dict
             if [ -f "$custom_dict" ]; then
                 dict_file="$custom_dict"
                 break
             else
-                echo -e "${RED}Error:${RESET} File does not exist. Please try again."
+                echo -e "${RED}    [✘] Error:${RESET} File does not exist. Please try again."
             fi
             ;;
         *)
@@ -1000,7 +1001,7 @@ while true; do
     esac
 done
 
-echo -e "\n${BOLD}Cracking WiFi password using:${RESET} $dict_file ${BOLD}->>${RESET}\n"
+echo -e "\n\n    ${BOLD}[⏳] Cracking WiFi password using:${RESET} $dict_file\n"
 
     gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c \
     "hashcat -m 22000 -a 0 \"$targets_path/$bssid_name/hash.hc22000\" \"$dict_file\" \
@@ -1049,7 +1050,7 @@ echo -e "\n${BOLD}Cracking WiFi password using:${RESET} $dict_file ${BOLD}->>${R
 
 function brute-force_attack() {
     
-    echo -e "${BOLD}\nCracking WiFi password with Hashcat ->>${RESET}\n"
+    echo -e "    ${BOLD}\nCracking WiFi password with Hashcat ->>${RESET}\n"
 
     # Ask user for password length
     while true; do
@@ -1264,10 +1265,11 @@ function cleanup() {
 
 function choose_attack() {
 	while true; do
-	    echo -e "\n\n${ORANGE}Choose how to Crack the Password:${RESET}"
-	    echo "1) Dictionary attack"
-	    echo "2) Brute-Force attack"
-	    read -p "Enter your choice: " choice
+	    echo -e "\n\n${NEON_YELLOW}${BOLD}->> Cracking the Password:${RESET}"
+	    echo -e "    ${BOLD}[?] Choose Cracking method${RESET}"
+	    echo "        1) Dictionary attack"
+	    echo "        2) Brute-Force attack"
+	    read -p "    Enter your choice (1 or 2): " choice
 	    echo
 
 	    case $choice in
