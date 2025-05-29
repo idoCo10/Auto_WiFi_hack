@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.6.7 # 29/5/25 22:20
+version=3.6.8 # 30/5/25 01:20
 
 
 ### Changlog ###
@@ -8,12 +8,11 @@ version=3.6.7 # 29/5/25 22:20
 
 
 ### FIX ###
-	# delay between scan to output in network_scanner
-	# Close the scan window
+	# delay between scan to output
 	# rebuild wpa2-wpa3
 	# Add timer to the pmkid attack
 	# Add timer after "device scan"
-	# Add hashcat output now that we removed gmone-terminal
+	# Add MORE hashcat output now that we removed gmone-terminal
 
 
 ### To Do ###
@@ -145,7 +144,7 @@ echo -e "\n\n"
 function first_setup() {
     echo -e "\n\n${BLUE}[*] Checking and installing required packages:${RESET}"
 
-    mandatory_packages=("aircrack-ng" "gnome-terminal" "hashcat" "hcxtools" "gawk" "dbus-x11")
+    mandatory_packages=("aircrack-ng" "hashcat" "hcxtools" "gawk" "dbus-x11")
     optional_packages=("wget" "macchanger" "mdk4")
     failed_mandatory=()
     failed_optional=()
@@ -412,7 +411,7 @@ function spoof_adapter_mac() {
 
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=15
+        countdown_duration=6
         #gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"      
         
         timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date >/dev/null 2>&1 &
@@ -661,6 +660,7 @@ function validate_network() {
 
     found=0
     echo -en "    ${BOLD}[⏳]${RESET} Checking.."
+    sleep 2
     
     for (( i=0; i<20; i++ )); do
         if [ "$(grep -c "$bssid_address" "$targets_path/$bssid_name/airodump_output.txt")" -ge 2 ]; then
@@ -1014,17 +1014,75 @@ done
 
 echo -e "\n\n    ${RED}->> Cracking WiFi Password using:${RESET} $dict_file\n"
 
+
+
+
+# OLD ######
+
     #gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -m 22000 -a 0 \"$targets_path/$bssid_name/hash.hc22000\" \"$dict_file\" --outfile \"$targets_path/$bssid_name/$bssid_name-wifi_password.txt\" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable; sleep 5"
     
     # No Terminal
-    (hashcat -m 22000 -a 0 "$targets_path/$bssid_name/hash.hc22000" "$dict_file" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable > /dev/null 2>&1 < /dev/null) & wait
+    #(hashcat -m 22000 -a 0 "$targets_path/$bssid_name/hash.hc22000" "$dict_file" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable > /dev/null 2>&1 < /dev/null) & wait
+    
+    
+# END OLD ######
+
+
+
+
+
+# NEW ###########
+
+status_fifo=$(mktemp -u)
+mkfifo "$status_fifo"
+
+
+hashcat -m 22000 -a 0 "$targets_path/$bssid_name/hash.hc22000" "$dict_file" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable > "$status_fifo" 2>/dev/null < /dev/null &
+
+hashcat_pid=$!
+    
+    
+# Read and parse the estimated time from the status output
+# Trap cleanup
+trap "rm -f \"$status_fifo\"; kill $! 2>/dev/null; exit" INT TERM
+
+# Launch background loop to read hashcat status
+{
+  while IFS= read -r line; do
+    if [[ "$line" == *"Time.Estimated"* ]]; then
+      countdown=$(echo "$line" | grep -oP '\(\K[^)]+' | sed 's/^ *//;s/ *$//')
+      echo -ne "\r    [⏳] Maximum Remaining Time: $countdown   "
+    fi
+  done
+} < "$status_fifo" &
+
+
+# Wait for hashcat to finish
+wait $hashcat_pid
+
+# Cleanup
+rm "$status_fifo"
+echo -e "\n${NEON_GREEN}    [✔]${RESET} Hashcat finished."
+
+
+# END NEW ##############    
+    
+    
+    
+    
+    
+    
     
 
     echo
     if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
         wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
-        echo -e "${BLUE}The WiFi password of${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET}\t${ORANGE}$wifi_pass${RESET}"
+
+        
+        echo -e "${BLUE}The WiFi password of${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET}	${ORANGE}$wifi_pass${RESET}"
         bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
+        
+        
         
         #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with// } }" "$targets_path/wifi_passwords.txt"
         sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with.*/ { s/\nPassword not cracked with.*// } }" "$targets_path/wifi_passwords.txt"
@@ -1188,19 +1246,90 @@ function brute-force_attack() {
 
     echo -e "\n\n${BOLD}Generated Hashcat mask:${RESET} ${RED}$full_mask${RESET}\n"
 
+
+
+
+
+
+# NEW ###########
+
+status_fifo=$(mktemp -u)
+mkfifo "$status_fifo"
+
+
     # Run hashcat with the correct options
-    if [[ -n "$charset" ]]; then
-        #gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
+    if [[ -n "$charset" ]]; then      
         
-        (hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable > /dev/null 2>&1 < /dev/null) & wait
-        
+        hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" "$charset" "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=1 --potfile-disable > "$status_fifo" 2>/dev/null < /dev/null &
+
+
+        hashcat_pid=$!
         
     else
-        #gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
-        
-        (hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable > /dev/null 2>&1 < /dev/null) & wait
+
+        hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=1 --potfile-disable > "$status_fifo" 2>/dev/null < /dev/null &
+
+        hashcat_pid=$!
         
     fi
+    
+
+# Read and parse the estimated time from the status output
+# Trap cleanup
+trap "rm -f \"$status_fifo\"; kill $! 2>/dev/null; exit" INT TERM
+
+# Launch background loop to read hashcat status
+{
+  while IFS= read -r line; do
+    if [[ "$line" == *"Time.Estimated"* ]]; then
+      countdown=$(echo "$line" | grep -oP '\(\K[^)]+' | sed 's/^ *//;s/ *$//')
+      echo -ne "\r    [⏳] Maximum Remaining Time: $countdown   "
+    fi
+  done
+} < "$status_fifo" &
+
+
+# Wait for hashcat to finish
+wait $hashcat_pid
+
+# Cleanup
+rm "$status_fifo"
+echo -e "\n${NEON_GREEN}    [✔]${RESET} Hashcat finished."
+
+
+# END NEW ##############
+
+
+
+
+
+
+
+
+
+# OLD ###
+
+    # Run hashcat with the correct options
+#    if [[ -n "$charset" ]]; then
+        #gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
+        
+#        (hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable > /dev/null 2>&1 < /dev/null) & wait
+        
+        
+#    else
+        #gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
+        
+#        (hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable > /dev/null 2>&1 < /dev/null) & wait
+        
+#    fi
+   
+# End OLD ###   
+   
+   
+   
+   
+   
+   
            
     echo
     if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
