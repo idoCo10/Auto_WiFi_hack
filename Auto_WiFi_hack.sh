@@ -1,17 +1,19 @@
 #!/bin/bash
 
-version=3.6.6 # 29/5/25 15:30
+version=3.6.7 # 29/5/25 22:20
 
 
 ### Changlog ###
-	# Added PMKID attack.
+	# Removed Gnome-Terminal.
 
 
 ### FIX ###
-	# delay between scan to output
+	# delay between scan to output in network_scanner
 	# Close the scan window
 	# rebuild wpa2-wpa3
 	# Add timer to the pmkid attack
+	# Add timer after "device scan"
+	# Add hashcat output now that we removed gmone-terminal
 
 
 ### To Do ###
@@ -411,7 +413,10 @@ function spoof_adapter_mac() {
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
         countdown_duration=15
-        gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"        
+        #gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"      
+        
+        timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date >/dev/null 2>&1 &
+        
 
         echo -e "\n\n\n${BLUE}[*] Scanning available WiFi Networks ($countdown_duration s):${RESET}"
         for (( i=$countdown_duration; i>=1; i-- )); do
@@ -1009,10 +1014,11 @@ done
 
 echo -e "\n\n    ${RED}->> Cracking WiFi Password using:${RESET} $dict_file\n"
 
-    gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c \
-    "hashcat -m 22000 -a 0 \"$targets_path/$bssid_name/hash.hc22000\" \"$dict_file\" \
-    --outfile \"$targets_path/$bssid_name/$bssid_name-wifi_password.txt\" \
-    --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable; sleep 5"
+    #gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -m 22000 -a 0 \"$targets_path/$bssid_name/hash.hc22000\" \"$dict_file\" --outfile \"$targets_path/$bssid_name/$bssid_name-wifi_password.txt\" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable; sleep 5"
+    
+    # No Terminal
+    (hashcat -m 22000 -a 0 "$targets_path/$bssid_name/hash.hc22000" "$dict_file" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable > /dev/null 2>&1 < /dev/null) & wait
+    
 
     echo
     if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
@@ -1180,13 +1186,20 @@ function brute-force_attack() {
         fi
     done
 
-    echo -e "\n\n${ORANGE}Generated Hashcat mask:${RESET} ${RED}$full_mask${RESET}\n"
+    echo -e "\n\n${BOLD}Generated Hashcat mask:${RESET} ${RED}$full_mask${RESET}\n"
 
     # Run hashcat with the correct options
     if [[ -n "$charset" ]]; then
-        gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
+        #gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
+        
+        (hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable > /dev/null 2>&1 < /dev/null) & wait
+        
+        
     else
-        gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
+        #gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
+        
+        (hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable > /dev/null 2>&1 < /dev/null) & wait
+        
     fi
            
     echo
@@ -1263,8 +1276,10 @@ function another_scan_prompt() {
 
 function cleanup() {
 	chown -R $UN:$UN $targets_path
-	gnome-terminal --geometry=1x1-10000-10000 -- airmon-ng stop "$wifi_adapter"
-	gnome-terminal --geometry=1x1-10000-10000 -- systemctl start NetworkManager
+	#gnome-terminal --geometry=1x1-10000-10000 -- airmon-ng stop "$wifi_adapter"
+	#gnome-terminal --geometry=1x1-10000-10000 -- systemctl start NetworkManager
+	airmon-ng stop "$wifi_adapter" >/dev/null 2>&1 &
+	systemctl start NetworkManager >/dev/null 2>&1 &
 }
 
 
