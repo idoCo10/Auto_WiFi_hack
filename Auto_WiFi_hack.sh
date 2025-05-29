@@ -1,10 +1,9 @@
 #!/bin/bash
 
-version=3.6.8 # 30/5/25 01:20
+version=3.6.8 # 30/5/25 02:20
 
+changelog="Improved full background commands"
 
-### Changlog ###
-	# Removed Gnome-Terminal.
 
 
 ### FIX ###
@@ -127,17 +126,32 @@ banner_lines=(
 
 # Print each line in red
 for line in "${banner_lines[@]}"; do
-    echo -e "${NEON_GREEN}${line}${RESET}"
+    echo -e "${NEON_PURPLE}${line}${RESET}"
 done
 
-echo -e "${ORANGE}   v$version ${RESET}"
+echo -e "${NEON_GREEN}   v$version ${RESET}"
 
 # Show cursor
 tput cnorm
+echo -e "\n"
+
+
+
+
+
+
+
+echo -e "${GREEN} ╔═"
+echo -e " ║${RED} ▶ ${WHITE}This script leveraging multiple attack vectors to efficiently capture and crack WiFi credentials"
+echo -e "${GREEN} ║${RED} ▶ ${WHITE}Workflow:${RESET} Scan ➝ Choose network ➝ Attack ➝ Capture ➝ Crack"
+echo -e "${GREEN} ║${RED} ▶ ${WHITE}Powered by:${RESET} airmon-ng, hcxtools, hashcat and more"
+echo -e "${GREEN} ║${RED} ▶ ${WHITE}Changlog:${RESET} ${changelog}"
+echo -e "${GREEN} ║${RED} ▶ ${RESET}Auto installs all dependencies"
+echo -e "${GREEN} ║${RED} ▶ ${RESET}Run as root (sudo)"
+echo -e "${GREEN} ╚═${RESET}"
+
+
 echo -e "\n\n"
-
-
-
 
 
 
@@ -411,7 +425,7 @@ function spoof_adapter_mac() {
 
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=6
+        countdown_duration=15
         #gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"      
         
         timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date >/dev/null 2>&1 &
