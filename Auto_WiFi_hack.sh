@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.6.8 # 30/5/25 02:20
+version=3.6.8 # 31/5/25 03:50
 
 
 
@@ -807,6 +807,9 @@ function attacks() {
 	animate_attack "Beacon Flooding attack" 20
 	animate_attack "Probe Request/Response attack" 13
 
+
+    echo -e "\n    [⏳] While attacking, Trying for 2 minutes to Capture the EAPOL or PMKID"
+
     # Start device scanner in background
     devices_scanner &
     scanner_pid=$!
@@ -851,6 +854,7 @@ function attacks() {
     # Kill scanner and hcxdumptool terminal
     kill "$scanner_pid" &>/dev/null
     kill "$terminal_pid" &>/dev/null
+    
     pkill aireplay-ng
     pkill airodump-ng
 
@@ -1075,7 +1079,7 @@ wait $hashcat_pid
 
 # Cleanup
 rm "$status_fifo"
-echo -e "\n${NEON_GREEN}    [✔]${RESET} Hashcat finished."
+echo -e "\n${NEON_GREEN}    [✔]${RESET}  Hashcat finished."
 
 
 # END NEW ##############    
@@ -1307,7 +1311,7 @@ wait $hashcat_pid
 
 # Cleanup
 rm "$status_fifo"
-echo -e "\n${NEON_GREEN}    [✔]${RESET} Hashcat finished."
+echo -e "\n${NEON_GREEN}    [✔]${RESET}  Hashcat finished."
 
 
 # END NEW ##############
