@@ -5,6 +5,6 @@ ZTE                 MF79U                        ZTE_9F1407            8        
 T3 Technology       T626ProV2              TrueGigatexFiber_2.4G_48A   8           Y         N           Y           N         64:20:E3       192.168.1.1     admin         8 Length [D+U]
 TP-Link             TL-MR100                     TP-LINK_F210          8           Y         N           N           N         74:FE:CE       192.168.1.1    -Empty-
 TP-Link             Archer AX55 (AX3000)         TP-Link_6AA4_5G       8           Y         N           N           N         B0:A7:B9                       admin
-Alpha               ASL-74322RT                  true_homa2G_07A       8           Y         Y           N           N         
+Alpha               ASL-74322RT                  true_homa2G_07A       8           Y         Y           N           N         88:6A:E3
 Asus                RT-AX1800HP                  ASUS_EO               8           Y         N           N           N         50:EB:F6
 Asus                RT-AX53U                     ASUS_D0               8           Y         N           N           N         50:EB:F6
