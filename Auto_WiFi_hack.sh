@@ -6,7 +6,7 @@ changelog="Improved full background commands"
 
 
 
-### FIX ###
+### To FIX ###
 	# delay between scan to output
 	# rebuild wpa2-wpa3
 	# Add timer to the pmkid attack
@@ -146,7 +146,8 @@ echo -e " ║${RED} ▶ ${WHITE}This script leveraging multiple attack vectors t
 echo -e "${GREEN} ║${RED} ▶ ${WHITE}Workflow:${RESET} Scan ➝ Choose network ➝ Attack ➝ Capture ➝ Crack"
 echo -e "${GREEN} ║${RED} ▶ ${WHITE}Powered by:${RESET} airmon-ng, hcxtools, hashcat and more"
 echo -e "${GREEN} ║${RED} ▶ ${WHITE}Changlog:${RESET} ${changelog}"
-echo -e "${GREEN} ║${RED} ▶ ${RESET}Auto installs all dependencies"
+echo -e "${GREEN} ║${RED} ▶ ${WHITE}Changlog:${RESET} Start while connected to internet (for the first time) in order to download dependencies"
+echo -e "${GREEN} ║${RED} ▶ ${RESET}Auto download and installs missing dependencies"
 echo -e "${GREEN} ║${RED} ▶ ${RESET}Run as root (sudo)"
 echo -e "${GREEN} ╚═${RESET}"
 
