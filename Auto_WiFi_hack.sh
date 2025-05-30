@@ -2,7 +2,6 @@
 
 version=3.6.8 # 30/5/25 02:20
 
-changelog="Improved full background commands"
 
 
 
@@ -145,10 +144,9 @@ echo -e "${GREEN} ╔═"
 echo -e " ║${RED} ▶ ${WHITE}This script leveraging multiple attack vectors to efficiently capture and crack WiFi credentials"
 echo -e "${GREEN} ║${RED} ▶ ${WHITE}Workflow:${RESET} Scan ➝ Choose network ➝ Attack ➝ Capture ➝ Crack"
 echo -e "${GREEN} ║${RED} ▶ ${WHITE}Powered by:${RESET} airmon-ng, hcxtools, hashcat and more"
-echo -e "${GREEN} ║${RED} ▶ ${WHITE}Changlog:${RESET} ${changelog}"
 echo -e "${GREEN} ║${RED} ▶ ${WHITE}Changlog:${RESET} Start while connected to internet (for the first time) in order to download dependencies"
-echo -e "${GREEN} ║${RED} ▶ ${RESET}Auto download and installs missing dependencies"
-echo -e "${GREEN} ║${RED} ▶ ${RESET}Run as root (sudo)"
+echo -e "${GREEN} ║${RED} ▶ ${RESET}The script auto download and installs missing dependencies"
+echo -e "${GREEN} ║${RED} ▶ ${RESET}Run as root or sudo"
 echo -e "${GREEN} ╚═${RESET}"
 
 
