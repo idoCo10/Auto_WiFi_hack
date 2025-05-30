@@ -1,8 +1,8 @@
 Vendor                 Model                      SSID  (pattern)     Length     Digits     Lowercase   Uppercase  Special      MAC             IP          Web Username   Web Password    
 -------             ----------------------       -----------------   -------    -------    ----------  ----------  -------   -------------  -------------  -------------  ---------------
-ZTE                 ZXHN H267A                 aisfibre_2.4G_5d3b66    8           Y         Y           N           N         30:1F:48       192.168.1.1     admin         aisadmin
+ZTE                 ZXHN H267A                 aisfibre_2.4G_3d3b96    8           Y         Y           N           N         30:1F:48       192.168.1.1     admin         aisadmin
 ZTE                 MF79U                        ZTE_9F1407            8           Y         N           Y           N         34:4B:50       192.168.0.1    -Empty-        8 Length [D+U]
-T3 Technology       T626ProV2                                          8           Y         N           Y           N         64:20:E3       192.168.1.1     admin         8 Length [D+U]
+T3 Technology       T626ProV2              TrueGigatexFiber_2.4G_48A   8           Y         N           Y           N         64:20:E3       192.168.1.1     admin         8 Length [D+U]
 TP-Link             TL-MR100                     TP-LINK_F210          8           Y         N           N           N         74:FE:CE       192.168.1.1    -Empty-
 TP-Link             Archer AX55 (AX3000)         TP-Link_6AA4_5G       8           Y         N           N           N         B0:A7:B9                       admin
 Alpha               ASL-74322RT                  true_homa2G_07A       8           Y         Y           N           N         
