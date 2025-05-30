@@ -7,4 +7,4 @@ TP-Link             TL-MR100                     TP-LINK_F210          8        
 TP-Link             Archer AX55 (AX3000)         TP-Link_6AA4_5G       8           Y         N           N           N         B0:A7:B9                       admin
 Alpha               ASL-74322RT                  true_homa2G_07A       8           Y         Y           N           N         
 Asus                RT-AX1800HP                  ASUS_EO               8           Y         N           N           N         50:EB:F6
-Asus                RT-AX53U                                           8           Y         N           N           N         50:EB:F6
+Asus                RT-AX53U                     ASUS_D0               8           Y         N           N           N         50:EB:F6
