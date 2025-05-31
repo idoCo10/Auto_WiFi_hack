@@ -261,7 +261,7 @@ function enable_gpu() {
     GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
 
     if [[ -z "$GPU_INFO" ]]; then
-        echo -e "\n${RED}    [✘]${RESET} ${RED}No NVIDIA GPU detected. Skipping GPU setup.${RESET}\n"
+        echo -e "${RED}    [✘]${RESET} No NVIDIA GPU detected. Skipping GPU setup.\n"
         return 1
     fi
     # Extract GPU model
