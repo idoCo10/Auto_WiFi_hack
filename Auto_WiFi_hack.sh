@@ -254,8 +254,8 @@ function enable_gpu() {
     echo -e "\n${BLUE}[*] Getting GPU details:${RESET}"
     # Check if running in a VM
     if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
-        echo -e "${NEON_YELLOW}${BOLD}    [⚠]${RESET} You are running inside a VM. ${RED}GPU is not available.${RESET}\n\n"
-        return 1
+        echo -e "${NEON_YELLOW}${BOLD}    [⚠]${RESET} You are running inside a VM. ${RESET}"
+       # return 1
     fi
     # Detect GPU
     GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
