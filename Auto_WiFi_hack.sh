@@ -1002,27 +1002,17 @@ function crack_wep() {
 
 
 
-
-
-
-
-
-
-
-
-
 remote_cracking() {
     local attack_mode="$1"  # Accept either "dictionary" or "bruteforce"
     local charset="$2"            # E.g. "-1 ?u?d"
     local full_mask="$3"          # E.g. "?1?1?1?1"    
     
-    local TARGET_IP="45.32.110.218"
+    read -p "Enter remote server IP: " TARGET_IP
+    #local TARGET_IP="45.32.110.218"
     local USER="root"
-    local PASS='@vN7yR85f??He$H%'
-    
-    #read -p "Enter remote server IP: " TARGET_IP
-    #read -s -p "Enter root SSH password: " PASS
-    #echo     
+    read -s -p "Enter root SSH password: " PASS
+    #local PASS='1+25f??He$H%'
+  
 
     local REMOTE_PATH="/root"
     local SSH_OPTIONS="-q -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
@@ -1194,58 +1184,6 @@ ENDSSH
     mv "$targets_path/$bssid_name/wifi_password.txt" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt"
     cracking_result
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
