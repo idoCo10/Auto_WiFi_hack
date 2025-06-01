@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.7 # 1/6/25 06:40
+version=3.7 # 1/6/25 08:10
 
 
 
@@ -1007,11 +1007,12 @@ remote_cracking() {
     local charset="$2"            # E.g. "-1 ?u?d"
     local full_mask="$3"          # E.g. "?1?1?1?1"    
     
+    
     read -p "Enter remote server IP: " TARGET_IP
-    #local TARGET_IP="45.32.110.218"
+    #local TARGET_IP="211.111.111.111"
     local USER="root"
-    read -s -p "Enter root SSH password: " PASS
-    #local PASS='1+25f??He$H%'
+    read -p "Enter root SSH password: " PASS
+    #local PASS='AAh.nwqk]s{bh79s'
   
 
     local REMOTE_PATH="/root"
@@ -1023,14 +1024,11 @@ remote_cracking() {
     echo -e "\n[*] Connecting to $TARGET_IP ...\n"
 
 
-   
-    sshpass -p "$PASS" ssh -T $SSH_OPTIONS "$USER@$TARGET_IP" remote_path="$REMOTE_PATH" wordlists_dir="$wordlists_dir" rockyou_gz="$rockyou_gz" rockyou_file="$rockyou_file" attack_mode="$attack_mode" charset="$charset" full_mask="$full_mask" bash -s <<'ENDSSH'
+
+    sshpass -p "$PASS" ssh -T $SSH_OPTIONS "$USER@$TARGET_IP" remote_path="$REMOTE_PATH" wordlists_dir="$wordlists_dir" rockyou_gz="$rockyou_gz" rockyou_file="$rockyou_file" attack_mode="$attack_mode" charset="'$charset'" full_mask="$full_mask" bash -s <<'ENDSSH'
    
     echo -e "\n\n\033[38;5;82m We are in the Server\033[0m\n"
     
-    
-    #mkdir -p "$remote_path"
-    #cd "$remote_path"
 
     remote_install_tools() {
         local PKGS=("hashcat" "wget")
