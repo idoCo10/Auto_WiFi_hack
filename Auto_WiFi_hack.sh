@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.7 # 1/6/25 08:10
+version=3.7 # 1/6/25 06:40
 
 
 
@@ -425,7 +425,7 @@ function spoof_adapter_mac() {
 
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=5
+        countdown_duration=15
         #gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"      
         
         timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date >/dev/null 2>&1 &
