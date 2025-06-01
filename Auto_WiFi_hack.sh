@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.7.2 # 1/6/25 02:20
+version=3.7.2 # 1/6/25 02:40
 
 
 
@@ -11,6 +11,9 @@ version=3.7.2 # 1/6/25 02:20
 	# Add timer to the pmkid attack
 	# Add timer after "device scan"
 	# Add MORE hashcat output now that we removed gmone-terminal
+	# Lower the size of airodump_output.txt (get more then 1GB!)
+	# GPU CUDA installation failed!
+
 
 
 ### To Do ###
@@ -22,6 +25,7 @@ version=3.7.2 # 1/6/25 02:20
 	# find attacks for WPA3
 	# Add clients untill we choose network.
 	# Show WPS routers - and add Pixydust attack.
+	# add gnome-terminal option if we are not not on server
 
 
 
@@ -1427,15 +1431,15 @@ echo -e "\n\n\n\033[38;5;82m    * * * We are in the Server! * * *\033[0m\n"
         local PKGS=("hashcat" "wget")
         local UPDATED_FLAG="/tmp/.apt_updated_once"
         if [ ! -f "$UPDATED_FLAG" ]; then
-            echo "${ORANGE}[!]${RESET} Running apt update..."
+            echo -e "${ORANGE}        [!]${RESET} Running apt update...\n"
             apt-get update >/dev/null 2>&1 || { echo "${RED}    [✘]${RESET} Failed to update. Exiting."; exit 1; }
             touch "$UPDATED_FLAG"
         fi
         echo -e "${BLUE}    [*] Checking and installing required packages:${RESET}"
         for pkg in "${PKGS[@]}"; do
             if ! command -v "$pkg" &>/dev/null; then
-                echo "${ORANGE}[!]${RESET} $pkg not found. Installing..."
-                sudo apt install -y "$pkg" || { echo "[ERROR] Could not install $pkg. Exiting."; exit 1; }
+                echo "${ORANGE}        [!]${RESET} $pkg not found. Installing..."
+                apt-get install -y "$pkg" >/dev/null 2>&1 || { echo -e "${RED}        [✘]${RESET} Could not install $pkg. Exiting."; exit 1; }
             else
                 echo "${NEON_GREEN}        [✔]${RESET} $pkg is already installed."
             fi
