@@ -426,7 +426,7 @@ function spoof_adapter_mac() {
 
 function network_scanner() {	
         # Scan 15 seconds for wifi networks   
-        countdown_duration=5
+        countdown_duration=15
         #gnome-terminal --geometry=110x35-10000-10000 -- bash -c "timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date"      
         
         timeout ${countdown_duration}s airodump-ng --band abg ${wifi_adapter} --ignore-negative-one --output-format csv -w $targets_path/Scan/Scan-$current_date >/dev/null 2>&1 &
@@ -1341,11 +1341,11 @@ remote_cracking() {
     local full_mask="${3:-?1?1?1?1?1?1?1?1}"   # default 8-digit brute-force
     
     
-    #read -p "    Enter remote server IP:  " TARGET_IP
-    #read -p "    Enter root SSH password: " PASS
+    read -p "    Enter remote server IP:  " TARGET_IP
+    read -p "    Enter root SSH password: " PASS
     local USER="root"
-    local TARGET_IP="45.76.22.225"
-    local PASS='-7LeYV.+dvBt?yb{'
+    #local TARGET_IP="12.45.3.2"
+    #local PASS='Aa123456'
     local REMOTE_PATH="/root"
     local SSH_OPTIONS="-q -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     
