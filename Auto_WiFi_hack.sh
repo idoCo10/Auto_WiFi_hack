@@ -1,18 +1,18 @@
 #!/bin/bash
 
-version=3.7.3 # 6/6/25 18:30
+version=3.7.3 # 6/6/25 18:55
 
 changelog="1/6/25 - Cracking hash via GPU Server!"
 
 
 ### To FIX ###
+	# !!!! Lower the size of airodump_output.txt (get more then 1GB!)
+	# GPU CUDA installation failed!
 	# delay between scan to output
 	# rebuild wpa2-wpa3
 	# Add timer to the pmkid attack
 	# Add timer after "device scan"
 	# Add MORE hashcat output now that we removed gmone-terminal
-	# Lower the size of airodump_output.txt (get more then 1GB!)
-	# GPU CUDA installation failed!
 
 
 
@@ -270,7 +270,7 @@ function first_setup() {
 
 
 
-function check_wordlist_oui() {
+function check_wordlist() {
 
     echo -e "\n\n\n${BLUE}[*] Verifying Wordlists and vendor data:${RESET}"
 
@@ -294,6 +294,11 @@ function check_wordlist_oui() {
             fi
         fi
     fi
+}
+
+
+
+function check_oui() {
 
     if [ -f "$oui_file" ]; then
         echo -e "${NEON_GREEN}    [✔]${RESET} Found OUI vendor file."
@@ -308,6 +313,7 @@ function check_wordlist_oui() {
     fi
     echo -e "\n"
 }
+
 
 
 function enable_gpu() {
@@ -1723,7 +1729,7 @@ function main_process() {
 }
 
 first_setup
-check_wordlist_oui
+check_wordlist
+check_oui
 enable_gpu
 main_process
-
