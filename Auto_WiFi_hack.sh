@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.7.3 # 6/6/25 18:55
+version=3.7.3 # 6/6/25 19:40
 
 changelog="1/6/25 - Cracking hash via GPU Server!"
 
@@ -426,7 +426,7 @@ function adapter_config() {
     for adapter in "${updated_adapters[@]}"; do
         if [[ ! " ${original_adapters[*]} " =~ " $adapter " ]] && [[ "$adapter" == *"mon" ]]; then
             wifi_adapter="$adapter"
-            echo -e "${NEON_GREEN}    [✔]${RESET} Successfully switched to monitor mode: $wifi_adapter\n\n"
+            echo -e "${NEON_GREEN}    [✔]${RESET} Successfully switched to monitor mode: ${BOLD}$wifi_adapter${RESET}\n\n"
             return 0
         fi
     done
