@@ -30,12 +30,9 @@ changelog="1/6/25 - Cracking hash via GPU Server!"
 
 
 #######################    Instructions    ######################
-# Start the script while connected to internet in order to download rockyou wordlist if not exist in it's path And OUI file for vendors name of devices and routers (will help identify farther attacks).
-
 # For Alfa AWUS036AXML wifi card:
 # 	To enable 6Ghz run: "iw reg set US" and reboot. to check if its enabled run: "iw list".
-
-
+#
 # **IMPORTANT** if we use GPU with Hashcat:
 # 	If there is blank screen after installing the GPU drivers on Kali live persistance -
 # 	You need to modify the file "/boot/grub/grub.cfg" from different operation system! (on kali the file will be read only):
