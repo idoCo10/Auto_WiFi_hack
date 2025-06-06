@@ -164,14 +164,14 @@ function first_setup() {
     echo -e "\n\n${BLUE}[*] Checking and installing required packages:${RESET}"
 
     mandatory_packages=("aircrack-ng" "hashcat" "hcxtools" "gawk" "dbus-x11")
-    optional_packages=("wget" "macchanger" "mdk4")
+    optional_packages=("wget" "net-tools" "macchanger" "mdk4")
     failed_mandatory=()
     failed_optional=()
 
     check_install() {
         local package="$1"
         if ! dpkg -l | grep -q "^ii  $package "; then
-            echo -e "${ORANGE}[!]${RESET} $package not found. Installing..."
+            echo -e "${ORANGE}    [!]${RESET} $package not found. Installing..."
             apt-get update -y >/dev/null  2>&1
             if apt-get install -y "$package" >/dev/null  2>&1; then
                 echo -e "${NEON_GREEN}    [✔]${RESET} $package installed successfully."
