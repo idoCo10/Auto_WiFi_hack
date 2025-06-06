@@ -1,8 +1,8 @@
 #!/bin/bash
 
-version=3.7.2 # 1/6/25 02:40
+version=3.7.3 # 6/6/25 18:30
 
-
+changelog="1/6/25 - Cracking hash via GPU Server!"
 
 
 ### To FIX ###
@@ -151,8 +151,8 @@ echo -e "${GREEN} ║${RED} ▶ ${WHITE}Powered by:${RESET} airmon-ng, hcxtools,
 echo -e "${GREEN} ║${RED} ▶ ${RESET}Start while connected to internet (for the first time) in order to download dependencies"
 echo -e "${GREEN} ║${RED} ▶ ${RESET}The script auto download and installs missing dependencies"
 echo -e "${GREEN} ║${RED} ▶ ${RESET}Run as root or sudo"
-echo -e "${GREEN} ╚═  ${WHITE}Changlog:${RESET}"
-echo -e "${RED}     ▶${RESET} 1.6.25 - Cracking hash via GPU Server!"
+echo -e "${GREEN} ╚═  ${WHITE}Changelog:${RESET}"
+echo -e "${RED}     ▶${RESET} $changelog"
 
 
 
@@ -163,64 +163,122 @@ echo -e "\n\n"
 function first_setup() {
     echo -e "\n\n${BLUE}[*] Checking and installing required packages:${RESET}"
 
-    mandatory_packages=("aircrack-ng" "hashcat" "hcxtools" "gawk" "dbus-x11")
-    optional_packages=("wget" "net-tools" "macchanger" "mdk4")
-    failed_mandatory=()
-    failed_optional=()
+    all_packages=("aircrack-ng" "hashcat" "hcxtools" "mdk4" "macchanger" "net-tools" "wget" "gawk" "dbus-x11")
+    failed_packages=()
+
+    required_hcx_version="6.3.5"
+
+    get_version() {
+        local package="$1"
+        case "$package" in
+            aircrack-ng) apt list --installed 2>/dev/null | grep '^aircrack-ng/' | sed -E 's/.* ([0-9]+:)?([0-9.]+)[^ ]*.*/\2/' ;;
+            hashcat) apt list --installed 2>/dev/null | grep '^hashcat/' | sed -E 's/.* ([0-9]+:)?([0-9.]+)[^ ]*.*/\2/' ;;
+            hcxtools) hcxhashtool --version 2>/dev/null | head -n1 | awk '{print $2}' ;;
+            mdk4) mdk4 --version 2>/dev/null | head -n1 | awk '{print $2}' ;;
+            macchanger) apt list --installed 2>/dev/null | grep '^macchanger/' | sed -E 's/.* ([0-9]+:)?([0-9]+\.[0-9]+\.[0-9]+).*/\2/' ;;
+            net-tools) apt list --installed 2>/dev/null | grep '^net-tools/' | sed -E 's/.* ([0-9]+:)?([0-9]+\.[0-9]+).*/\2/' ;;
+            wget) wget --version 2>/dev/null | head -n1 | awk '{print $3}' ;;
+            gawk) gawk --version 2>/dev/null | head -n1 | awk '{print $3}' ;;
+            dbus-x11) apt list --installed 2>/dev/null | grep '^dbus-x11/' | sed -E 's/.* ([0-9]+:)?([0-9]+\.[0-9]+\.[0-9]+).*/\2/' ;;
+            *) echo "" ;;
+        esac
+    }
+
+    version_compare() {
+        dpkg --compare-versions "$1" ge "$2"
+    }
 
     check_install() {
         local package="$1"
+        
+        if [ "$package" = "macchanger" ]; then
+            echo "macchanger macchanger/automatically_run boolean false" | sudo debconf-set-selections
+        fi
+        
         if ! dpkg -l | grep -q "^ii  $package "; then
             echo -e "${ORANGE}    [!]${RESET} $package not found. Installing..."
-            apt-get update -y >/dev/null  2>&1
-            if apt-get install -y "$package" >/dev/null  2>&1; then
-                echo -e "${NEON_GREEN}    [✔]${RESET} $package installed successfully."
+            apt-get update -y >/dev/null 2>&1
+            if apt-get install -y "$package" >/dev/null 2>&1; then
+                version=$(get_version "$package")
+                echo -e "${NEON_GREEN}    [✔]${RESET} $package installed successfully. (v${version})"
                 return 0
             else
                 echo -e "${RED}    [✘] Failed to install $package.${RESET}"
                 return 1
             fi
         else
-            echo -e "${NEON_GREEN}    [✔]${RESET} $package already installed."
+            version=$(get_version "$package")
+            echo -e "${NEON_GREEN}    [✔]${RESET} $package already installed. (v${version})"
             return 0
         fi
     }
 
-    for package in "${mandatory_packages[@]}"; do
+    install_hcxdumptool_from_github() {
+        #echo -e "${BLUE}[*] Installing hcxdumptool v$required_hcx_version from GitHub...${RESET}"
+        tmp_dir=$(mktemp -d)
+        cd "$tmp_dir" || exit 1
+
+        wget -q https://github.com/ZerBea/hcxdumptool/releases/download/${required_hcx_version}/hcxdumptool-${required_hcx_version}.tar.gz
+        if [[ $? -ne 0 ]]; then
+            echo -e "${RED}    [✘] Failed to download hcxdumptool.${RESET}"
+            exit 1
+        fi
+
+        tar -xzf hcxdumptool-${required_hcx_version}.tar.gz
+        cd hcxdumptool-${required_hcx_version} || exit 1
+
+        #echo -e "${BLUE}[*] Installing build dependencies...${RESET}"
+        sudo apt-get install -y build-essential libcurl4-openssl-dev libssl-dev pkg-config libpcap-dev >/dev/null 2>&1
+
+        make clean >/dev/null 2>&1
+        make >/dev/null 2>&1
+        sudo make install >/dev/null 2>&1
+
+        #echo -e "${BLUE}[*] Verifying installation...${RESET}"
+        new_version=$(hcxdumptool --version 2>/dev/null | head -n1 | awk '{print $2}')
+        if [[ "$new_version" != "$required_hcx_version" ]]; then
+            echo -e "${RED}    [✘] Installation failed. Expected $required_hcx_version but got $new_version.${RESET}"
+            exit 1
+        else
+            echo -e "${NEON_GREEN}    [✔]${RESET} hcxdumptool installed successfully. (v$new_version)"
+        fi
+
+        cd ~
+        rm -rf "$tmp_dir"
+    }
+
+    for package in "${all_packages[@]}"; do
         if ! check_install "$package"; then
-            failed_mandatory+=("$package")
+            failed_packages+=("$package")
         fi
     done
 
-    for package in "${optional_packages[@]}"; do
-        if ! check_install "$package"; then
-            failed_optional+=("$package")
-        fi
-    done
-
-    if [ "${#failed_mandatory[@]}" -ne 0 ]; then
-        echo -e "\n${RED}    [✘]${RESET} The following mandatory packages failed to install:"
-        for pkg in "${failed_mandatory[@]}"; do
+    if [ "${#failed_packages[@]}" -ne 0 ]; then
+        echo -e "\n${RED}    [✘]${RESET} The following packages failed to install:"
+        for pkg in "${failed_packages[@]}"; do
             echo "   - $pkg"
         done
         echo -e "\nPlease install them manually before running the script again.\n"
         exit 1
     fi
 
-    if [ "${#failed_optional[@]}" -ne 0 ]; then
-        echo -e "\n${ORANGE}    [!]${RESET} The following optional packages failed to install:"
-        for pkg in "${failed_optional[@]}"; do
-            echo "   - $pkg"
-        done
-        echo -e "The script will continue, but some features may not work as expected.\n"
-    fi
-    
+	current_hcx_version=$(hcxdumptool --version 2>/dev/null | head -n1 | awk '{print $2}')
+	if [[ -z "$current_hcx_version" ]] || ! dpkg --compare-versions "$current_hcx_version" ge "$required_hcx_version"; then
+	    install_hcxdumptool_from_github
+	else
+	    echo -e "${NEON_GREEN}    [✔]${RESET} hcxdumptool already installed. (v$current_hcx_version)"
+	fi
+
+}
+
+
+
+function check_wordlist_oui() {
 
     echo -e "\n\n\n${BLUE}[*] Verifying Wordlists and vendor data:${RESET}"
 
     if [ ! -d "$wordlists_dir" ]; then
         mkdir -p "$wordlists_dir"
-        echo -e "${ORANGE}    [+]${RESET} Wordlist directory created at $wordlists_dir"
     fi
 
     if [ -f "$rockyou_file" ]; then
@@ -253,7 +311,6 @@ function first_setup() {
     fi
     echo -e "\n"
 }
-
 
 
 function enable_gpu() {
@@ -315,54 +372,34 @@ function enable_gpu() {
 
 function adapter_config() {
     echo -e "\n${BLUE}[*] Detecting WiFi adapters:${RESET}"
-    airmon-ng check kill > /dev/null 2>&1   # Kill interfering processes
+    airmon-ng check kill > /dev/null 2>&1
 
-    # Get all WiFi interfaces
-    adapters=($(iw dev | awk '$1=="Interface"{print $2}'))
+    # Get all WiFi interfaces BEFORE any changes
+    original_adapters=($(iw dev | awk '$1=="Interface"{print $2}'))
 
-    if [[ ${#adapters[@]} -eq 0 ]]; then
+    if [[ ${#original_adapters[@]} -eq 0 ]]; then
         echo -e "${RED}    [✘] No WiFi adapters detected.${RESET}\n"
         read -p "    Enter your WiFi adapter name: " manual_adapter
-        if [[ -z "$manual_adapter" ]]; then
-            echo -e "${RED}    [✘] No input provided. Exiting.${RESET}"
-            exit 1
-        fi
+        [[ -z "$manual_adapter" ]] && { echo -e "${RED}    [✘] No input provided. Exiting.${RESET}"; exit 1; }
         wifi_adapter="$manual_adapter"
-
-    elif [[ ${#adapters[@]} -eq 1 ]]; then
-        wifi_adapter="${adapters[0]}"
+    elif [[ ${#original_adapters[@]} -eq 1 ]]; then
+        wifi_adapter="${original_adapters[0]}"
         echo -e "${NEON_GREEN}    [✔]${RESET} WiFi adapter detected: ${BOLD}$wifi_adapter${RESET}"
-    
     else
-        # Display the adapter list with vendor names
-        for i in "${!adapters[@]}"; do
-            adapter="${adapters[$i]}"
-
-            if [[ "$adapter" == *"mon" ]]; then
-                # Get permanent MAC for monitor-mode adapter
-                perm_mac=$(macchanger -s "$adapter" 2>/dev/null | awk -F': ' '/Permanent MAC:/ {print $2}' | cut -d' ' -f1 | tr '[:lower:]' '[:upper:]')
-                mac_addr="$perm_mac"
-            else
-                # Use current MAC for normal mode adapter
-                mac_addr=$(cat /sys/class/net/$adapter/address 2>/dev/null | tr '[:lower:]' '[:upper:]')
-            fi
-
+        for i in "${!original_adapters[@]}"; do
+            adapter="${original_adapters[$i]}"
+            mac_addr=$(cat /sys/class/net/$adapter/address 2>/dev/null | tr '[:lower:]' '[:upper:]')
             vendor=$(get_oui_vendor "$mac_addr")
-            [[ -z "$vendor" ]] && vendor="unkon"
-
+            [[ -z "$vendor" ]] && vendor="unknown"
             printf "    %d) %-12s (%s)\n" "$((i + 1))" "$adapter" "$vendor"
         done
         echo
-
         while true; do
             read -p "    Select an adapter: " input
-
-            # If numeric and valid index
-            if [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= ${#adapters[@]} )); then
-                wifi_adapter="${adapters[$((input - 1))]}"
+            if [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= ${#original_adapters[@]} )); then
+                wifi_adapter="${original_adapters[$((input - 1))]}"
                 break
-            # If matches adapter name directly
-            elif [[ " ${adapters[*]} " =~ " $input " ]]; then
+            elif [[ " ${original_adapters[*]} " =~ " $input " ]]; then
                 wifi_adapter="$input"
                 break
             else
@@ -371,25 +408,30 @@ function adapter_config() {
         done
     fi
 
-    # If already in monitor mode, skip enabling it again
     if [[ "$wifi_adapter" == *"mon" ]]; then
         echo -e "${NEON_GREEN}    [✔]${RESET} Adapter is already in monitor mode.\n\n"
         return 0
     fi
 
+    # Start monitor mode
     airmon-ng start "$wifi_adapter" > /dev/null 2>&1
 
-    # Look for the new monitor mode adapter
-    mon_adapter=$(iw dev | awk '/Interface/ && /mon$/ {print $2}' | grep "^${wifi_adapter}mon$")
+    # Capture interfaces AFTER enabling monitor mode
+    updated_adapters=($(iw dev | awk '$1=="Interface"{print $2}'))
 
-    if [[ -n "$mon_adapter" ]]; then
-        echo -e "${NEON_GREEN}    [✔]${RESET} Successfully switched $wifi_adapter to monitor mode.\n\n"
-        wifi_adapter=$mon_adapter        
-    else
-        echo -e "${RED}    [✘] Failed to start $wifi_adapter in monitor mode.${RESET} Check your adapter and try again.\n\n"
-        exit 1
-    fi
+    # Find new interface
+    for adapter in "${updated_adapters[@]}"; do
+        if [[ ! " ${original_adapters[*]} " =~ " $adapter " ]] && [[ "$adapter" == *"mon" ]]; then
+            wifi_adapter="$adapter"
+            echo -e "${NEON_GREEN}    [✔]${RESET} Successfully switched to monitor mode: $wifi_adapter\n\n"
+            return 0
+        fi
+    done
+
+    echo -e "${RED}    [✘] Failed to detect monitor-mode adapter.${RESET} Check your adapter and try again.\n\n"
+    exit 1
 }
+
 
 
 
@@ -1054,7 +1096,7 @@ function choose_attack() {
 
 function dictionary_attack() {
 while true; do
-    echo -e "\n    ${BOLD}[?] Choose a Wordlist:${RESET}"
+    echo -e "\n    ${BOLD}Choose a Wordlist:${RESET}"
     echo "        1) Use Rockyou"
     echo "        2) Use a different wordlist"
     read -p "    Enter your choice (1 or 2): " wordlist_choice
@@ -1684,7 +1726,7 @@ function main_process() {
 }
 
 first_setup
+check_wordlist_oui
 enable_gpu
 main_process
-
 
