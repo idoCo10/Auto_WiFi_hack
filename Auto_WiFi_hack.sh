@@ -1,12 +1,11 @@
 #!/bin/bash
 
-version=3.7.3 # 6/6/25 19:40
+version=3.7.3 # 6/6/25 20:30
 
 changelog="1/6/25 - Cracking hash via GPU Server!"
 
 
 ### To FIX ###
-	# !!!! Lower the size of airodump_output.txt (get more then 1GB!)
 	# GPU CUDA installation failed!
 	# delay between scan to output
 	# rebuild wpa2-wpa3
@@ -714,20 +713,17 @@ function choose_network() {
 function validate_network() {
     echo -e "${BLUE}[*] Validating Network:${RESET}"
     
-
     #gnome-terminal --geometry=95x12-10000-10000 -- script -c "airodump-ng --band abg -c $channel -w '$targets_path/$bssid_name/$bssid_name' -d $bssid_address $wifi_adapter" "$targets_path/$bssid_name/airodump_output.txt"
 
-
     # Open airodump-ng in a hidden terminal
-    (airodump-ng --band abg -c $channel -w $targets_path/$bssid_name/$bssid_name -d $bssid_address $wifi_adapter > "$targets_path/$bssid_name/airodump_output.txt" 2>&1 < /dev/null) & disown
-
+    (airodump-ng --band abg -c $channel -w $targets_path/$bssid_name/$bssid_name -d $bssid_address $wifi_adapter  > /dev/null 2>&1 < /dev/null) & disown
 
     found=0
     echo -en "    ${BOLD}[⏳]${RESET} Checking.."
     sleep 2
     
     for (( i=0; i<20; i++ )); do
-        if [ "$(grep -c "$bssid_address" "$targets_path/$bssid_name/airodump_output.txt")" -ge 2 ]; then
+        if grep -q "$bssid_address" "$targets_path/$bssid_name/$bssid_name-01.kismet.netxml"; then
             found=1
             echo -e "\n${NEON_GREEN}    [✔]${RESET} Network available!\n"
             break
@@ -849,12 +845,7 @@ function attacks() {
         band=""
     fi
 
-    echo -e "${RED}->> Starting Attacks:${RESET}"      
-
-    
-    #echo -e "\n     ${RED}[->] Capturing 4-way handshake${RESET}"
-    #echo -e "\n     ${RED}[->] Testing for Rogue AP/Misassociation${RESET}"
-    
+    echo -e "${RED}->> Starting Attacks:${RESET}"        
     
 	animate_attack() {
 	    local message="$1"
