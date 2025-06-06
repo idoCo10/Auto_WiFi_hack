@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.7.3 # 6/6/25 20:30
+version=3.7.3 # 6/6/25 20:50
 
 changelog="1/6/25 - Cracking hash via GPU Server!"
 
@@ -271,7 +271,7 @@ function first_setup() {
 
 function check_wordlist() {
 
-    echo -e "\n\n\n${BLUE}[*] Verifying Wordlists and vendor data:${RESET}"
+    echo -e "\n\n\n${BLUE}[*] Verifying Rockyou wordlist existens:${RESET}"
 
     if [ ! -d "$wordlists_dir" ]; then
         mkdir -p "$wordlists_dir"
@@ -298,9 +298,9 @@ function check_wordlist() {
 
 
 function check_oui() {
-
+    echo -e "\n\n\n${BLUE}[*] Verifying OUI vendors file existens:${RESET}"
     if [ -f "$oui_file" ]; then
-        echo -e "${NEON_GREEN}    [✔]${RESET} Found OUI vendor file."
+        echo -e "${NEON_GREEN}    [✔]${RESET} Found OUI vendors file."
     else
         echo -e "${ORANGE}    [+]${RESET} Downloading OUI vendor file..."
         wget -q https://raw.githubusercontent.com/idoCo10/OUI-list-2025/main/oui.txt -O "$targets_path"/oui.txt
@@ -326,7 +326,7 @@ function enable_gpu() {
     GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
 
     if [[ -z "$GPU_INFO" ]]; then
-        echo -e "${RED}    [✘]${RESET} No NVIDIA GPU detected. Skipping GPU setup.\n"
+        echo -e "${RED}    [✘]${RESET} No NVIDIA GPU detected. Skipping GPU setup.\n\n"
         return 1
     fi
     # Extract GPU model
@@ -1097,6 +1097,7 @@ while true; do
 
     case "$wordlist_choice" in
         1)
+            check_wordlist
             dict_file="$rockyou_file"
             break
             ;;
@@ -1720,7 +1721,6 @@ function main_process() {
 }
 
 first_setup
-check_wordlist
 check_oui
 enable_gpu
 main_process
