@@ -338,8 +338,8 @@ function enable_gpu() {
         CUDA_VERSION=$(nvidia-smi | grep -i "CUDA Version" | awk '{print $6}')
         echo -e "${NEON_GREEN}    [✔]${RESET} CUDA version: ${ORANGE}$CUDA_VERSION${RESET}"
     else
-        echo -e "\n${ORANGE}    [!]${RESET} CUDA is not detected."
-        read -p "Would you like to install CUDA? (Y/n): " response
+        echo -e "${ORANGE}    [!]${RESET} CUDA is not detected."
+        read -p "    Would you like to install CUDA? (Y/n): " response
         if [[ "$response" =~ ^[Yy]$ ]]; then
             echo -e "\n    [~] Installing NVIDIA CUDA drivers..."
 	    packages=("linux-headers-amd64" "nvidia-driver" "nvidia-cuda-toolkit")
