@@ -16,6 +16,7 @@ changelog="1/6/25 - Cracking hash via GPU Server!"
 
 
 ### To Do ###
+	# Add eviel twin fake upgrade page with "wifiphisher"
 	# Add Hashcat options for auto configure combinations. + Add possibilities calc. + show the mask better. + option to remove wrong mask.
 	# run all networks or range of them at the same time.
 	# add more dictioneries than rockyou? or change the default from rockyou - LOOK for better WIFI wordlist
