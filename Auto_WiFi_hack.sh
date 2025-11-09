@@ -304,7 +304,7 @@ function check_oui() {
         echo -e "${NEON_GREEN}    [✔]${RESET} Found OUI vendors file."
     else
         echo -e "${ORANGE}    [+]${RESET} Downloading OUI vendor file..."
-        wget -q https://raw.githubusercontent.com/idoCo10/OUI-list-2025/main/oui.txt -O "$targets_path"/oui.txt
+        wget -q https://raw.githubusercontent.com/idoCo10/OUI-list/main/oui.txt -O "$targets_path"/oui.txt
         if [ -f "$oui_file" ]; then
             echo -e "${NEON_GREEN}    [✔]${RESET} OUI vendor file downloaded."
         else
