@@ -160,7 +160,7 @@ echo -e "\n\n"
 function first_setup() {
     echo -e "\n\n${BLUE}[*] Checking and installing required packages:${RESET}"
 
-    all_packages=("aircrack-ng" "hashcat" "hcxtools" "mdk4" "macchanger" "net-tools" "wget" "gawk" "dbus-x11")
+    all_packages=("aircrack-ng" "hashcat" "hcxtools" "mdk4" "macchanger" "net-tools" "wget" "gawk" "dbus-x11" "gnome-terminal")
     failed_packages=()
 
     required_hcx_version="6.3.5"
@@ -177,6 +177,7 @@ function first_setup() {
             wget) wget --version 2>/dev/null | head -n1 | awk '{print $3}' ;;
             gawk) gawk --version 2>/dev/null | head -n1 | awk '{print $3}' ;;
             dbus-x11) apt list --installed 2>/dev/null | grep '^dbus-x11/' | sed -E 's/.* ([0-9]+:)?([0-9]+\.[0-9]+\.[0-9]+).*/\2/' ;;
+            gnome-terminal) gnome-terminal --version 2>/dev/null | head -n1 | awk '{print $4}' ;;			
             *) echo "" ;;
         esac
     }
