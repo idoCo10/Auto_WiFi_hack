@@ -1,3 +1,5 @@
+Wi-Fi password structure detail of vendors:
+
 Vendor                 Model                      SSID  (pattern)     Length     Digits     Lowercase   Uppercase  Special      MAC             IP          Web Username   Web Password    
 -------             ----------------------       -----------------   -------    -------    ----------  ----------  -------   -------------  -------------  -------------  ---------------
 ZTE                 ZXHN H267A                 aisfibre_2.4G_3d3b96    8           Y         Y           N           N         30:1F:48       192.168.1.1     admin         aisadmin
