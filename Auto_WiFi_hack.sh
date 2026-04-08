@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.7.3 # 6/6/25 20:50
+version=3.7.4 # 9/4/26 02:38
 
 changelog="1/6/25 - Cracking hash via GPU Server!"
 
@@ -633,8 +633,8 @@ function choose_network() {
         power=$(echo "$chosen_row" | awk -F', ' '{print $4}')
         bssid_name=$(echo "$chosen_row" | awk -F', ' '{print $5}')
         bssid_name_original=${bssid_name}
-
-		# Replace "/" and spaces with "_"
+        
+        # Replace "/" and spaces with "_"
         bssid_name=${bssid_name//[\/ ]/_}
 
         oui_vendor=$(get_oui_vendor)
@@ -1306,81 +1306,105 @@ function brute-force_attack() {
 
     echo -e "\n\n${BOLD}Generated Hashcat mask:${RESET} ${RED}$full_mask${RESET}\n"
     
-
     if [[ "$mode" == "remote" ]]; then
         remote_cracking bruteforce "$charset" "$full_mask"
         return
     fi    
-    
 
-# NEW ###########
+# ---------------- STATUS PART (REPLACE YOUR CURRENT ONE WITH THIS) ----------------
 
 status_fifo=$(mktemp -u)
 mkfifo "$status_fifo"
 
+# Start time (formatted)
+start_time=$(date "+%a %b %d %H:%M:%S %Y")
+script_start_time=$(date +%s)
 
-    # Run hashcat with the correct options
-    if [[ -n "$charset" ]]; then      
-        
-        hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" "$charset" "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=1 --potfile-disable > "$status_fifo" 2>/dev/null < /dev/null &
+# Run hashcat
+if [[ -n "$charset" ]]; then      
+    hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" "$charset" "$full_mask" \
+    --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" \
+    --force --optimized-kernel-enable --status --status-timer=1 --potfile-disable \
+    > "$status_fifo" 2>/dev/null < /dev/null &
+else
+    hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" "$full_mask" \
+    --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" \
+    --force --optimized-kernel-enable --status --status-timer=1 --potfile-disable \
+    > "$status_fifo" 2>/dev/null < /dev/null &
+fi
 
+hashcat_pid=$!
 
-        hashcat_pid=$!
-        
-    else
+trap "rm -f \"$status_fifo\"; kill $hashcat_pid 2>/dev/null; exit" INT TERM
 
-        hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" "$full_mask" --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=1 --potfile-disable > "$status_fifo" 2>/dev/null < /dev/null &
+speed=""
+progress=""
+estimated=""
+estimated_full=""
+ready=false
+header_printed=false
 
-        hashcat_pid=$!
-        
+exec 3<"$status_fifo"
+
+while kill -0 $hashcat_pid 2>/dev/null; do
+
+    while read -t 0.2 -u 3 line; do
+
+        if [[ "$line" == *"Speed.#"* ]]; then
+            speed=$(echo "$line" | grep -oP '[0-9.]+ *[kMGT]?H/s')
+        fi
+
+        if [[ "$line" == *"Progress"* ]]; then
+            progress=$(echo "$line" | grep -oP '\(\K[0-9.]+(?=%)')%
+        fi
+
+        if [[ "$line" == *"Time.Estimated"* ]]; then
+            # Full line after colon
+            estimated_full=$(echo "$line" | cut -d':' -f2- | sed 's/^ *//')
+
+            # Only inside ()
+            estimated=$(echo "$line" | grep -oP '\(\K[^)]+' )
+        fi
+
+        # Print header once when we have estimated
+        if [[ "$header_printed" == false && -n "$estimated_full" ]]; then
+            header_printed=true
+            echo -e "    ${BOLD}[🚀] Started:${RESET} $start_time"
+            echo -e "    ${BOLD}[⏳] Estimated:${RESET} $estimated_full"
+        fi
+
+        # Ready when all values exist
+        if [[ "$ready" == false && -n "$speed" && -n "$progress" && -n "$estimated" ]]; then
+            ready=true
+            echo
+        fi
+
+    done
+
+    if [[ "$ready" == true ]]; then
+        now=$(date +%s)
+        elapsed=$((now - script_start_time))
+
+        printf -v time_fmt "%02d:%02d:%02d" \
+            $((elapsed/3600)) \
+            $(( (elapsed%3600)/60 )) \
+            $((elapsed%60))
+
+        printf "\r    [⏱] Time: %s | ⚡ Speed: %s | 📊 Progress: %s | ⏳ ETA: %s        " "$time_fmt" "$speed" "$progress" "$estimated"
     fi
-    
 
-# Read and parse the estimated time from the status output
-# Trap cleanup
-trap "rm -f \"$status_fifo\"; kill $! 2>/dev/null; exit" INT TERM
+    sleep 1
+done
 
-# Launch background loop to read hashcat status
-{
-  while IFS= read -r line; do
-    if [[ "$line" == *"Time.Estimated"* ]]; then
-      countdown=$(echo "$line" | grep -oP '\(\K[^)]+' | sed 's/^ *//;s/ *$//')
-      echo -ne "\r    [⏳] Maximum Remaining Time: $countdown   "
-    fi
-  done
-} < "$status_fifo" &
-
-
-# Wait for hashcat to finish
 wait $hashcat_pid
+echo
 
-# Cleanup
+exec 3<&-
 rm "$status_fifo"
+
 echo -e "\n${NEON_GREEN}    [✔]${RESET}  Hashcat finished.\n"
 
-cracking_result
-# END NEW ##############
-
-
-# OLD ###
-
-    # Run hashcat with the correct options
-#    if [[ -n "$charset" ]]; then
-        #gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
-        
-#        (hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $charset $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable > /dev/null 2>&1 < /dev/null) & wait
-        
-        
-#    else
-        #gnome-terminal --geometry=82x21-10000-10000 --wait -- bash -c "hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable" 
-        
-#        (hashcat -a 3 -m 22000 "$targets_path/$bssid_name/hash.hc22000" $full_mask --outfile "$targets_path/$bssid_name/$bssid_name-wifi_password.txt" --force --optimized-kernel-enable --status --status-timer=5 --potfile-disable > /dev/null 2>&1 < /dev/null) & wait
-        
-#    fi
-   
-# End OLD ###   
-
-  
+    cracking_result
 }
 
 
