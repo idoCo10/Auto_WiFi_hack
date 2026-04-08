@@ -634,10 +634,8 @@ function choose_network() {
         bssid_name=$(echo "$chosen_row" | awk -F', ' '{print $5}')
         bssid_name_original=${bssid_name}
 
-        # Remove "/" from bssid name
-        if [[ $bssid_name == *"/"* ]]; then
-            bssid_name=${bssid_name//\//}
-        fi
+		# Replace "/" and spaces with "_"
+        bssid_name=${bssid_name//[\/ ]/_}
 
         oui_vendor=$(get_oui_vendor)
 
