@@ -773,7 +773,7 @@ function devices_scanner() {
                     vendor=$(get_oui_vendor "$mac")
 
                     # Skip "Private" devices before adding to seen_macs
-                    if [[ "$vendor" == "Private" ]]; then
+                    if [[ "$vendor" == "Private ()" ]]; then
                         continue
                     fi
 
