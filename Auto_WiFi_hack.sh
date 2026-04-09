@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=3.7.4 # 9/4/26 02:38
+version=3.7.5 # 10/4/26 01:28
 
 changelog="1/6/25 - Cracking hash via GPU Server!"
 
@@ -324,23 +324,48 @@ function enable_gpu() {
         echo -e "${NEON_YELLOW}${BOLD}    [⚠]${RESET} You are running inside a VM."
 #        return 1
     fi
+
     # Detect GPU
+
+    get_gpu_model() {
+        # 1. Preferred: nvidia-smi
+        if command -v nvidia-smi &>/dev/null; then
+            nvidia-smi --query-gpu=name --format=csv,noheader | head -n1
+            return
+        fi
+
+        # 2. Fallback: /proc (NVIDIA driver info)
+        if ls /proc/driver/nvidia/gpus/*/information &>/dev/null; then
+            grep "Model:" /proc/driver/nvidia/gpus/*/information 2>/dev/null \
+                | head -n1 | cut -d: -f2 | xargs
+            return
+        fi
+
+        # 3. Final fallback
+        echo "Unknown NVIDIA GPU"
+    }
+
+    # Detect via lspci (basic presence check)
     GPU_INFO=$(lspci -nn | grep -i 'vga\|3d' | grep -i 'nvidia')
 
     if [[ -z "$GPU_INFO" ]]; then
         echo -e "${RED}    [✘]${RESET} No NVIDIA GPU detected. Skipping GPU setup.\n\n"
         return 1
     fi
+
     # Extract GPU model
-    GPU_MODEL=$(echo "$GPU_INFO" | sed -nE 's/.*NVIDIA Corporation [^[]*\[([^]]+)\].*/\1/p')
-    echo -e "${NEON_GREEN}    [✔]${RESET} GPU detected: ${ORANGE}NVIDIA $GPU_MODEL${RESET}"
+    GPU_MODEL=$(get_gpu_model)
+    DRIVER_VERSION=$(nvidia-smi | grep -i "Driver Version" | awk '{print $6}')
+
+    echo -e "${NEON_GREEN}    [✔]${RESET} GPU detected: ${ORANGE}${GPU_MODEL}${RESET}"
+    echo -e "${NEON_GREEN}    [✔]${RESET} Driver version: ${ORANGE}${DRIVER_VERSION}${RESET}"
 
     # Check for CUDA
     if command -v nvidia-smi &>/dev/null; then
-        CUDA_VERSION=$(nvidia-smi | grep -i "CUDA Version" | awk '{print $6}')
+        CUDA_VERSION=$(nvidia-smi | grep -i "CUDA Version" | awk '{print $9}')
         echo -e "${NEON_GREEN}    [✔]${RESET} CUDA version: ${ORANGE}$CUDA_VERSION${RESET}"
     else
-        echo -e "${ORANGE}    [!]${RESET} CUDA is not detected."
+        echo -e "${ORANGE}    [!]${RESET} CUDA is not detected. (it's optional)"
         read -p "    Would you like to install CUDA? (Y/n): " response
         if [[ "$response" =~ ^[Yy]$ ]]; then
             echo -e "\n    [~] Installing NVIDIA CUDA drivers..."
@@ -1369,7 +1394,7 @@ while kill -0 $hashcat_pid 2>/dev/null; do
         # Print header once when we have estimated
         if [[ "$header_printed" == false && -n "$estimated_full" ]]; then
             header_printed=true
-            echo -e "    ${BOLD}[🚀] Started:${RESET} $start_time"
+            echo -e "    ${BOLD}[🚀] Started:${RESET}   $start_time"
             echo -e "    ${BOLD}[⏳] Estimated:${RESET} $estimated_full"
         fi
 
@@ -1390,7 +1415,7 @@ while kill -0 $hashcat_pid 2>/dev/null; do
             $(( (elapsed%3600)/60 )) \
             $((elapsed%60))
 
-        printf "\r    [⏱] Time: %s | ⚡ Speed: %s | 📊 Progress: %s | ⏳ ETA: %s        " "$time_fmt" "$speed" "$progress" "$estimated"
+        printf "\r    ⏱ Time: %s | ⚡ Speed: %s | 📊 Progress: %s | ⏳ ETA: %s        " "$time_fmt" "$speed" "$progress" "$estimated"
     fi
 
     sleep 1
